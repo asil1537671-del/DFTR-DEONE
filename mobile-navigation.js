@@ -2,6 +2,7 @@
   window.__daftariNavigationManaged = true;
   const KEY = '__daftariNavigation';
   const SNAPSHOT_KEY = '__daftariReloadSnapshot';
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   const rawPushState = history.pushState.bind(history);
   const rawReplaceState = history.replaceState.bind(history);
   let restoring = false;
@@ -65,6 +66,7 @@
       forms,
       controls,
       calculator: {
+        enabled: !Boolean(document.querySelector('.calc')?.hidden),
         open: Boolean(document.getElementById('calcBox')?.classList.contains('open')),
         expression: typeof expr === 'string' ? expr : null,
         result: typeof calcResult === 'string' ? calcResult : null,
@@ -99,6 +101,11 @@
     }
     const calculator = snapshot.calculator;
     if (calculator) {
+      const calculatorWidget = document.querySelector('.calc');
+      if (typeof calculator.enabled === 'boolean' && calculatorWidget) {
+        calculatorWidget.hidden = !calculator.enabled;
+        window.syncCalculatorCardState?.();
+      }
       if (calculator.expression != null && typeof expr === 'string') expr = calculator.expression;
       if (calculator.result != null && typeof calcResult === 'string') calcResult = calculator.result;
       if (calculator.evaluated != null && typeof calcEvaluated === 'boolean') calcEvaluated = calculator.evaluated;
@@ -186,7 +193,9 @@
     lastState = restoredPath[restoredPath.length - 1] || homeState();
     bootState = lastState;
   } else {
-    nativePush(homeState(), { captureParent: false });
+    const home = homeState();
+    rawReplaceState(home, '');
+    lastState = home;
   }
 
   if (restoringReload) {
@@ -315,7 +324,7 @@
   }
   [
     'clientForm', 'transactionForm', 'editClient', 'profitForm', 'trashForm',
-    'openTransactionDetails', 'editRecordForm', 'exchangeSettingsForm'
+    'openTransactionDetails', 'editRecordForm', 'exchangeSettingsForm', 'openAccountStatements', 'openAnalytics'
   ]
     .forEach(trackModalScreen);
 
@@ -366,6 +375,8 @@
       openTransactionDetails: () => openTransactionDetails(...args),
       editRecordForm: () => editRecordForm(...args),
       exchangeSettingsForm: () => exchangeSettingsForm(...args),
+      openAccountStatements: () => window.openAccountStatements?.(),
+      openAnalytics: () => window.openAnalytics?.(),
       clientExchangeForm: () => clientExchangeForm(...args)
     };
     if (args[0]) {
@@ -425,14 +436,24 @@
 
   // A screen made from a dialog or profile form returns to its parent screen first.
   window.addEventListener('popstate', event => {
-    event.stopImmediatePropagation();
     const previous = lastState;
     let target = normalizeState(event.state);
-    lastState = target;
 
     const calc = document.getElementById('calcBox');
     if (calc?.classList.contains('open')) {
+      event.stopImmediatePropagation();
       calc.classList.remove('open');
+      const stayOn = previous ? { ...previous, scroll: captureScroll() } : homeState();
+      rawPushState(stayOn, '');
+      lastState = stayOn;
+      return;
+    }
+
+    const openClientMenu = document.querySelector('.client-menu-popover:not([hidden])');
+    if (openClientMenu) {
+      event.stopImmediatePropagation();
+      openClientMenu.hidden = true;
+      document.querySelectorAll('.client-menu-toggle[aria-expanded="true"]').forEach(toggle => toggle.setAttribute('aria-expanded', 'false'));
       const stayOn = previous ? { ...previous, scroll: captureScroll() } : homeState();
       rawPushState(stayOn, '');
       lastState = stayOn;
@@ -441,15 +462,16 @@
 
     if (!target || !target[KEY]) {
       if (previous?.[KEY] === 'home') {
-        const stayOn = { ...previous, scroll: captureScroll() };
-        rawPushState(stayOn, '');
-        lastState = stayOn;
-      } else {
-        restoreState(homeState());
-        nativePush(homeState(), { captureParent: false });
+        lastState = target;
+        return;
       }
+      event.stopImmediatePropagation();
+      restoreState(homeState());
+      nativePush(homeState(), { captureParent: false });
       return;
     }
+    event.stopImmediatePropagation();
+    lastState = target;
     if (target[KEY] === 'dialog') target = target.parent || homeState();
     restoreState(target);
   }, true);
