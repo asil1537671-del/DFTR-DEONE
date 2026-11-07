@@ -9,7 +9,6 @@ const PROJECT_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(PROJECT_ROOT, 'data');
 const UPLOADS_DIR = path.join(PROJECT_ROOT, 'uploads');
 const INDEX_FILE = path.join(DATA_DIR, 'documents.json');
-const LEGACY_LEDGER_FILE = path.join(DATA_DIR, 'legacy-ledger.json');
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 15 * 1024 * 1024;
 const PORT = Number(process.env.PORT || 8765);
@@ -187,15 +186,8 @@ async function createDocument(req, res) {
 }
 
 async function handleApi(req, res, url) {
-  const pathname = url.pathname;
-
-  // A single-use local bridge lets an existing file:// installation keep its
-  // ledger while the app moves to the authenticated localhost version.  The
-  // server only listens on 127.0.0.1 and this endpoint deliberately accepts
-  // the browser's `null` origin used by file:// pages.
-  if (pathname === '/api/legacy-ledger') return handleLegacyLedger(req, res);
-
   if (!validateOrigin(req, res)) return;
+  const pathname = url.pathname;
 
   if (req.method === 'GET' && pathname === '/api/documents') {
     const clientId = url.searchParams.get('clientId');
@@ -242,64 +234,6 @@ async function handleApi(req, res, url) {
   }
 
   return fail(res, 404, 'المسار غير موجود.');
-}
-
-function legacyCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', 'null');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Vary', 'Origin');
-}
-
-async function handleLegacyLedger(req, res) {
-  legacyCors(res);
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-
-  if (req.method === 'POST') {
-    if (req.headers.origin !== 'null') return fail(res, 403, 'هذه العملية متاحة للنسخة المحلية القديمة فقط.');
-    try {
-      const body = await readJsonBody(req);
-      const snapshot = typeof body?.snapshot === 'string' ? body.snapshot : '';
-      if (!snapshot || Buffer.byteLength(snapshot, 'utf8') > 4 * 1024 * 1024 || !parseJsonObject(snapshot)) {
-        return fail(res, 400, 'نسخة البيانات المحلية غير صالحة.');
-      }
-      const temporary = `${LEGACY_LEDGER_FILE}.${randomUUID()}.tmp`;
-      await writeFile(temporary, JSON.stringify({ snapshot, savedAt: new Date().toISOString() }), 'utf8');
-      await rename(temporary, LEGACY_LEDGER_FILE);
-      return json(res, 201, { saved: true });
-    } catch (error) {
-      console.error('تعذر حفظ نسخة البيانات القديمة:', error);
-      return fail(res, 500, 'تعذر حفظ نسخة البيانات المحلية.');
-    }
-  }
-
-  if (req.method === 'GET') {
-    const origin = req.headers.origin;
-    if (origin && !allowedOrigins.has(origin)) return fail(res, 403, 'مصدر الطلب غير مسموح.');
-    try {
-      const saved = JSON.parse(await readFile(LEGACY_LEDGER_FILE, 'utf8'));
-      return json(res, 200, { snapshot: typeof saved?.snapshot === 'string' ? saved.snapshot : '' });
-    } catch (error) {
-      if (error.code === 'ENOENT') return json(res, 200, { snapshot: '' });
-      console.error('تعذر قراءة نسخة البيانات القديمة:', error);
-      return fail(res, 500, 'تعذر قراءة نسخة البيانات المحلية.');
-    }
-  }
-
-  return fail(res, 405, 'طريقة الطلب غير مدعومة.');
-}
-
-function parseJsonObject(value) {
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed);
-  } catch {
-    return false;
-  }
 }
 
 const server = createServer(async (req, res) => {
