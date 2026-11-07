@@ -43,7 +43,29 @@
   analyticsCard.addEventListener('click', () => window.openAnalytics?.());
   cards.append(analyticsCard);
 
+  // Personal withdrawals live in their own ledger.  They never create or change a
+  // client record, debt, payment, or client balance.  Older single-amount entries
+  // are normalized here so existing data remains visible as one-item withdrawals.
   db.personalWithdrawals = Array.isArray(db.personalWithdrawals) ? db.personalWithdrawals : [];
+  const normalizeDigits = value => String(value ?? '')
+    .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+  const withdrawalAmounts = entry => {
+    const listed = Array.isArray(entry?.amounts) ? entry.amounts : [];
+    const amounts = listed.map(value => Number(normalizeDigits(value).replace(/,/g, ''))).filter(value => Number.isFinite(value) && value > 0);
+    if (amounts.length) return amounts;
+    const legacyAmount = Number(entry?.amount);
+    return Number.isFinite(legacyAmount) && legacyAmount > 0 ? [legacyAmount] : [];
+  };
+  const withdrawalTotal = entry => withdrawalAmounts(entry).reduce((total, amount) => total + amount, 0);
+  const withdrawalTime = entry => {
+    if (entry?.time) return String(entry.time).slice(0, 5);
+    if (!entry?.createdAt) return '';
+    const date = new Date(entry.createdAt);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+  const withdrawalTimestamp = entry => `${niceDate(entry.date)}${withdrawalTime(entry) ? ` · ${withdrawalTime(entry)}` : ''}`;
+  const sortWithdrawals = entries => [...entries].sort((a, b) => String(b.occurredAt || b.createdAt || b.date || '').localeCompare(String(a.occurredAt || a.createdAt || a.date || '')));
   const cashCard = document.createElement('button');
   cashCard.type = 'button';
   cashCard.id = 'cash-liquidity-card';
@@ -55,7 +77,7 @@
   withdrawalsCard.type = 'button';
   withdrawalsCard.id = 'personal-withdrawals-card';
   withdrawalsCard.className = 'card personal-withdrawals-card';
-  withdrawalsCard.innerHTML = '<span class="cash-card-head"><span class="withdrawals-card-icon" aria-hidden="true">↗</span><span><strong>السحوبات الشخصية</strong><small>تسجيل ومراجعة السحوبات اليومية</small></span></span><span class="withdrawals-card-total" data-withdrawals-total>0 عملية اليوم</span>';
+  withdrawalsCard.innerHTML = '<span class="cash-card-head"><span class="withdrawals-card-icon" aria-hidden="true">↗</span><span><strong>السحوبات الشخصية</strong><small>سجل مستقل لا يدخل في ديون أو أرصدة العملاء</small></span></span><span class="withdrawals-card-total" data-withdrawals-total>لا توجد سحوبات اليوم</span>';
   cards.append(withdrawalsCard);
 
   function currencyTotals(entries, direction) {
@@ -73,7 +95,7 @@
       if (record.type === 'payment') payments.push(record);
     }));
     const collected = currencyTotals(payments, record => Number(record.amount) || 0);
-    const withdrawn = currencyTotals(db.personalWithdrawals || [], entry => Number(entry.amount) || 0);
+    const withdrawn = currencyTotals(db.personalWithdrawals || [], withdrawalTotal);
     const balances = {};
     new Set([...Object.keys(collected), ...Object.keys(withdrawn)]).forEach(currency => {
       balances[currency] = (collected[currency] || 0) - (withdrawn[currency] || 0);
@@ -94,7 +116,8 @@
     cashCard.setAttribute('aria-label', `إجمالي السيولة: ${netEntries.length ? netEntries.map(([currency, amount]) => `${fmt(Math.abs(amount))} ${currency}`).join('، ') : 'لا توجد سيولة مسجلة'}`);
     const currentDay = today();
     const todayEntries = (db.personalWithdrawals || []).filter(entry => entry.date === currentDay);
-    withdrawalsCard.querySelector('[data-withdrawals-total]').textContent = todayEntries.length ? `${fmt(todayEntries.length)} سحوبات اليوم · ${formatCurrencyTotals(currencyTotals(todayEntries, entry => Number(entry.amount) || 0), '')}` : 'لا توجد سحوبات اليوم';
+    const withdrawalsTotal = withdrawalsCard.querySelector('[data-withdrawals-total]');
+    withdrawalsTotal.innerHTML = todayEntries.length ? `${fmt(todayEntries.length)} سحبة اليوم · ${formatCurrencyTotals(currencyTotals(todayEntries, withdrawalTotal), '')}` : 'لا توجد سحوبات اليوم';
   }
 
   function openCashLiquidity() {
@@ -104,31 +127,110 @@
     bindClose();
   }
 
+  function withdrawalCurrencyOptions() {
+    return '<option value="" selected disabled>اختر العملة</option>' + ['YER', 'USD', 'SAR', 'USDT'].filter(currency => currencies[currency]).map(currency => `<option value="${currency}">${currencies[currency]}</option>`).join('');
+  }
+
+  function parseWithdrawalAmounts(values) {
+    return (Array.isArray(values) ? values : [values]).flatMap(value => normalizeDigits(value).split(/[\n,،;؛\s]+/)).map(part => Number(part.replace(/,/g, ''))).filter(amount => Number.isFinite(amount) && amount > 0);
+  }
+
+  function formatDraftWithdrawalTotal(amounts, currency) {
+    return amounts.length ? `${fmt(amounts.reduce((total, amount) => total + amount, 0))} ${currencyDisplay(currency)}` : `0 ${currencyDisplay(currency)}`;
+  }
+
   function openPersonalWithdrawals() {
-    const withdrawals = [...(db.personalWithdrawals || [])].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-    const items = withdrawals.slice(0, 30).map(entry => `<div class="personal-withdrawal-row"><span><strong>${fmt(entry.amount)} ${currencyDisplay(entry.currency || 'USD')}</strong><small>${niceDate(entry.date)}${entry.note ? ` · ${esc(entry.note)}` : ''}</small></span><button type="button" class="soft-btn" data-withdrawal-delete="${esc(entry.id)}">حذف</button></div>`).join('') || '<div class="empty">لا توجد سحوبات شخصية مسجلة.</div>';
-    showModal(`<div class="modal-head"><h3>السحوبات الشخصية</h3>${closeButton()}</div><form id="personalWithdrawalForm"><div class="grid2"><div class="field"><label>المبلغ</label><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required placeholder="0.00"></div><div class="field"><label>العملة</label><select name="currency"><option value="SAR">🇸🇦 ريال سعودي</option><option value="USD">🇺🇸 دولار أمريكي</option><option value="YER">🇾🇪 ريال يمني</option><option value="USDT">₮ USDT</option></select></div></div><div class="field"><label>ملاحظة</label><input name="note" maxlength="160" placeholder="سبب السحب (اختياري)"></div><div class="field"><label>التاريخ</label><input name="date" type="date" lang="en" dir="ltr" required value="${today()}"></div><div class="form-actions"><button class="primary" type="submit">تسجيل السحب</button></div></form><section class="personal-withdrawals-list"><h4>آخر السحوبات</h4>${items}</section>`);
+    const withdrawals = sortWithdrawals(db.personalWithdrawals || []);
+    const totals = currencyTotals(withdrawals, withdrawalTotal);
+    const items = withdrawals.slice(0, 30).map(entry => `<button type="button" class="personal-withdrawal-row" data-withdrawal-id="${esc(entry.id)}"><span><strong>${fmt(withdrawalTotal(entry))} ${currencyDisplay(entry.currency || 'USD')}</strong><small>${withdrawalTimestamp(entry)} · ${fmt(withdrawalAmounts(entry).length)} مبالغ${entry.source ? ` · ${esc(entry.source)}` : ''}</small></span><span class="withdrawal-row-arrow" aria-hidden="true">‹</span></button>`).join('') || '<div class="empty">لا توجد سحوبات شخصية مسجلة.</div>';
+    const currentTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+    showModal(`<div class="modal-head"><div><h3>السحوبات اليومية</h3><p class="withdrawals-independent-note">سجل مستقل تمامًا عن ديون العملاء وتسديداتهم وأرصدتهم.</p></div>${closeButton()}</div><section class="withdrawals-summary"><span>إجمالي السحوبات المسجلة</span><strong>${formatCurrencyTotals(totals, 'لا توجد سحوبات مسجلة')}</strong><small>${fmt(withdrawals.length)} سحبة مستقلة</small></section><form id="personalWithdrawalForm"><h4>سحب جديد</h4><div class="grid2"><div class="field"><label>العملة أولاً</label><select name="currency" required>${withdrawalCurrencyOptions()}</select></div><div class="field"><label>التاريخ</label><input name="date" type="date" lang="en" dir="ltr" required value="${today()}"></div></div><div class="field withdrawal-amounts-field" data-withdrawal-amounts hidden><label>المبالغ</label><div class="withdrawal-amount-list" data-withdrawal-amount-list></div><small class="muted">يُضاف حقل جديد تلقائيًا بعد إدخال كل مبلغ.</small></div><div class="withdrawal-draft-total" data-withdrawal-draft hidden><span>الإجمالي</span><strong data-withdrawal-draft-total>0</strong><small data-withdrawal-draft-count>0 مبالغ</small></div><div class="grid2"><div class="field"><label>المصدر</label><input name="source" maxlength="100" placeholder="فرع، محفظة، أو مورد (اختياري)"></div><div class="field"><label>الوقت</label><input name="time" type="time" lang="en" dir="ltr" required value="${currentTime}"></div></div><div class="field"><label>ملاحظة</label><input name="note" maxlength="160" placeholder="توضيح إضافي (اختياري)"></div><div class="form-actions"><button class="primary" type="submit" data-withdrawal-submit disabled>إضافة سحب</button></div></form><section class="personal-withdrawals-list"><h4>سجل السحوبات</h4>${items}</section>`);
     bindClose();
-    document.getElementById('personalWithdrawalForm').addEventListener('submit', event => {
+    const form = document.getElementById('personalWithdrawalForm');
+    const currencyField = form.elements.currency;
+    const amountsField = form.querySelector('[data-withdrawal-amounts]');
+    const amountList = form.querySelector('[data-withdrawal-amount-list]');
+    const draftBox = form.querySelector('[data-withdrawal-draft]');
+    const draftTotal = form.querySelector('[data-withdrawal-draft-total]');
+    const draftCount = form.querySelector('[data-withdrawal-draft-count]');
+    const submitButton = form.querySelector('[data-withdrawal-submit]');
+    const getAmounts = () => parseWithdrawalAmounts([...amountList.querySelectorAll('.withdrawal-amount-input')].map(input => input.value));
+    const addAmountInput = () => {
+      const input = document.createElement('input');
+      input.className = 'withdrawal-amount-input';
+      input.type = 'text';
+      input.inputMode = 'decimal';
+      input.lang = 'en';
+      input.dir = 'ltr';
+      input.autocomplete = 'off';
+      input.placeholder = '0.00';
+      input.setAttribute('aria-label', `المبلغ ${amountList.children.length + 1}`);
+      input.addEventListener('input', () => {
+        const inputs = [...amountList.querySelectorAll('.withdrawal-amount-input')];
+        if (input === inputs.at(-1) && input.value.trim()) addAmountInput();
+        updateDraft();
+      });
+      amountList.append(input);
+      return input;
+    };
+    const updateDraft = () => {
+      const amounts = getAmounts();
+      const currency = currencyField.value;
+      draftTotal.innerHTML = currency ? formatDraftWithdrawalTotal(amounts, currency) : '0';
+      draftCount.textContent = `${fmt(amounts.length)} مبالغ`;
+      submitButton.disabled = !currency || !amounts.length;
+    };
+    currencyField.addEventListener('change', () => {
+      const selected = Boolean(currencyField.value);
+      amountsField.hidden = !selected;
+      draftBox.hidden = !selected;
+      if (selected && !amountList.children.length) addAmountInput().focus();
+      updateDraft();
+    });
+    form.addEventListener('submit', event => {
       event.preventDefault();
-      const values = new FormData(event.currentTarget);
-      const amount = Number(String(values.get('amount') || '').replace(/,/g, ''));
+      const values = new FormData(form);
+      const amounts = getAmounts();
       const currency = String(values.get('currency') || 'USD');
-      if (!Number.isFinite(amount) || amount <= 0 || !currencies[currency]) { toast('تحقق من المبلغ والعملة'); return; }
-      db.personalWithdrawals.unshift({ id: crypto.randomUUID(), amount, currency, note: String(values.get('note') || '').trim(), date: String(values.get('date') || today()), createdAt: new Date().toISOString() });
+      const date = String(values.get('date') || today());
+      const time = String(values.get('time') || currentTime).slice(0, 5);
+      if (!amounts.length || !currencies[currency] || !/^\d{2}:\d{2}$/.test(time)) { toast('أدخل مبالغًا صحيحة وحدد العملة والوقت'); return; }
+      db.personalWithdrawals.unshift({
+        id: crypto.randomUUID(),
+        amounts,
+        amount: amounts.reduce((total, amount) => total + amount, 0),
+        currency,
+        source: String(values.get('source') || '').trim(),
+        note: String(values.get('note') || '').trim(),
+        date,
+        time,
+        occurredAt: new Date(`${date}T${time}:00`).toISOString(),
+        createdAt: new Date().toISOString()
+      });
       save();
       refreshCashCards();
       openPersonalWithdrawals();
-      toast('تم تسجيل السحب الشخصي');
+      toast('تم حفظ السحب المستقل');
     });
-    document.querySelectorAll('[data-withdrawal-delete]').forEach(button => button.addEventListener('click', () => {
-      const id = button.dataset.withdrawalDelete;
-      db.personalWithdrawals = db.personalWithdrawals.filter(entry => String(entry.id) !== String(id));
+    document.querySelectorAll('[data-withdrawal-id]').forEach(button => button.addEventListener('click', () => openWithdrawalDetails(button.dataset.withdrawalId)));
+  }
+
+  function openWithdrawalDetails(id) {
+    const entry = (db.personalWithdrawals || []).find(item => String(item.id) === String(id));
+    if (!entry) return openPersonalWithdrawals();
+    const amounts = withdrawalAmounts(entry);
+    const amountRows = amounts.map((amount, index) => `<li><span>${fmt(index + 1)}</span><strong>${fmt(amount)} ${currencyDisplay(entry.currency || 'USD')}</strong></li>`).join('');
+    showModal(`<div class="modal-head"><div><h3>تفاصيل السحب</h3><p class="withdrawals-independent-note">عملية مستقلة ولا تؤثر في أرصدة أو ديون العملاء.</p></div>${closeButton()}</div><section class="withdrawal-detail-total"><span>إجمالي السحب</span><strong>${fmt(withdrawalTotal(entry))} ${currencyDisplay(entry.currency || 'USD')}</strong><small>${withdrawalTimestamp(entry)} · ${fmt(amounts.length)} مبالغ</small></section><section class="withdrawal-detail-list"><h4>المبالغ المضمنة</h4><ol>${amountRows}</ol></section><dl class="withdrawal-detail-meta"><div><dt>المصدر</dt><dd>${entry.source ? esc(entry.source) : 'غير محدد'}</dd></div><div><dt>الملاحظة</dt><dd>${entry.note ? esc(entry.note) : 'لا توجد ملاحظة'}</dd></div></dl><div class="form-actions"><button type="button" class="soft-btn" id="withdrawalBack">العودة للسجل</button><button type="button" class="danger" id="withdrawalDelete">حذف السحب</button></div>`);
+    bindClose();
+    document.getElementById('withdrawalBack').onclick = openPersonalWithdrawals;
+    document.getElementById('withdrawalDelete').onclick = () => {
+      if (!confirm('حذف هذا السحب المستقل نهائيًا؟')) return;
+      db.personalWithdrawals = db.personalWithdrawals.filter(item => String(item.id) !== String(id));
       save();
       refreshCashCards();
       openPersonalWithdrawals();
       toast('تم حذف السحب');
-    }));
+    };
   }
 
   cashCard.addEventListener('click', openCashLiquidity);
