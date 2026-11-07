@@ -48,6 +48,10 @@
   // client record, debt, payment, or client balance.  Older single-amount entries
   // are normalized here so existing data remains visible as one-item withdrawals.
   db.personalWithdrawals = Array.isArray(db.personalWithdrawals) ? db.personalWithdrawals : [];
+  // Liquidity is entered manually as the actual balances held in cash boxes and
+  // bank accounts.  It intentionally has no relation to clients, debts, payments,
+  // or personal withdrawals.
+  db.liquidityEntries = Array.isArray(db.liquidityEntries) ? db.liquidityEntries : [];
   const normalizeDigits = value => String(value ?? '')
     .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
     .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
@@ -71,7 +75,7 @@
   cashCard.type = 'button';
   cashCard.id = 'cash-liquidity-card';
   cashCard.className = 'card cash-liquidity-card';
-  cashCard.innerHTML = '<span class="cash-card-head"><span class="cash-card-icon" aria-hidden="true">▣</span><span><strong>إجمالي السيولة</strong><small>التسديدات بعد السحوبات الشخصية</small></span></span><span class="cash-card-values" data-cash-values>لا توجد سيولة مسجلة</span>';
+  cashCard.innerHTML = '<span class="cash-card-head"><span class="cash-card-icon" aria-hidden="true">▣</span><span><strong>إجمالي السيولة</strong><small>أرصدة الخزائن والبنوك المستقلة</small></span></span><span class="cash-card-values" data-cash-values>لا توجد سيولة مسجلة</span>';
   cards.append(cashCard);
 
   const withdrawalsCard = document.createElement('button');
@@ -91,17 +95,7 @@
   }
 
   function collectLiquidity() {
-    const payments = [];
-    (db.clients || []).forEach(client => (client.records || []).forEach(record => {
-      if (record.type === 'payment') payments.push(record);
-    }));
-    const collected = currencyTotals(payments, record => Number(record.amount) || 0);
-    const withdrawn = currencyTotals(db.personalWithdrawals || [], withdrawalTotal);
-    const balances = {};
-    new Set([...Object.keys(collected), ...Object.keys(withdrawn)]).forEach(currency => {
-      balances[currency] = (collected[currency] || 0) - (withdrawn[currency] || 0);
-    });
-    return { collected, withdrawn, balances };
+    return currencyTotals(db.liquidityEntries || [], entry => Number(entry.amount) || 0);
   }
 
   function formatCurrencyTotals(totals, empty = 'لا توجد بيانات') {
@@ -112,8 +106,8 @@
   function refreshCashCards() {
     const liquidity = collectLiquidity();
     const cashValues = cashCard.querySelector('[data-cash-values]');
-    const netEntries = Object.entries(liquidity.balances).filter(([, amount]) => Math.abs(amount) > 0.0001);
-    cashValues.innerHTML = netEntries.length ? formatCurrencyTotals(liquidity.balances) : 'لا توجد سيولة مسجلة';
+    const netEntries = Object.entries(liquidity).filter(([, amount]) => Math.abs(amount) > 0.0001);
+    cashValues.innerHTML = netEntries.length ? formatCurrencyTotals(liquidity) : 'لا توجد سيولة مسجلة';
     cashCard.setAttribute('aria-label', `إجمالي السيولة: ${netEntries.length ? netEntries.map(([currency, amount]) => `${fmt(Math.abs(amount))} ${currency}`).join('، ') : 'لا توجد سيولة مسجلة'}`);
     const currentDay = today();
     const todayEntries = (db.personalWithdrawals || []).filter(entry => entry.date === currentDay);
@@ -123,9 +117,38 @@
 
   function openCashLiquidity() {
     const liquidity = collectLiquidity();
-    const rows = Object.keys(liquidity.balances).sort().map(currency => `<div class="cash-liquidity-row"><span>${currencyDisplay(currency)}</span><b>${fmt(liquidity.collected[currency] || 0)}</b><b>${fmt(liquidity.withdrawn[currency] || 0)}</b><strong>${fmt(liquidity.balances[currency] || 0)}</strong></div>`).join('') || '<div class="empty">لا توجد تسديدات أو سحوبات مسجلة حتى الآن.</div>';
-    showModal(`<div class="modal-head"><h3>إجمالي السيولة</h3>${closeButton()}</div><p class="cash-modal-note">تُحسب السيولة من التسديدات المسجلة بعد خصم السحوبات الشخصية.</p><div class="cash-liquidity-table"><div class="cash-liquidity-row cash-liquidity-header"><span>العملة</span><b>التسديدات</b><b>السحوبات</b><strong>المتاح</strong></div>${rows}</div>`);
+    const totals = formatCurrencyTotals(liquidity, 'لا توجد سيولة مسجلة');
+    const entries = [...(db.liquidityEntries || [])].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    const rows = entries.slice(0, 50).map(entry => `<button type="button" class="personal-withdrawal-row" data-liquidity-id="${esc(entry.id)}"><span><strong>${fmt(entry.amount)} ${currencyDisplay(entry.currency || 'USD')}</strong><small>${esc(entry.location || 'خزنة أو بنك')}${entry.note ? ` · ${esc(entry.note)}` : ''}</small></span><span class="withdrawal-row-arrow" aria-hidden="true">×</span></button>`).join('') || '<div class="empty">أضف رصيد خزنة أو حساب بنكي ليظهر هنا.</div>';
+    showModal(`<div class="modal-head"><div><h3>إجمالي السيولة</h3><p class="cash-modal-note">أرصدة تُدخلها يدويًا للخزائن والبنوك، وهي مستقلة تمامًا عن الديون والتسديدات والسحوبات.</p></div>${closeButton()}</div><section class="withdrawals-summary"><span>إجمالي الأرصدة المسجلة</span><strong>${totals}</strong><small>${fmt(entries.length)} رصيد مستقل</small></section><form id="liquidityEntryForm"><h4>إضافة رصيد سيولة</h4><div class="grid2"><div class="field"><label>العملة</label><select name="currency" required>${withdrawalCurrencyOptions()}</select></div><div class="field"><label>المبلغ</label><input name="amount" type="text" inputmode="decimal" lang="en" dir="ltr" autocomplete="off" placeholder="0.00" required></div></div><div class="field"><label>الخزنة أو البنك</label><input name="location" maxlength="100" placeholder="مثال: خزنة المكتب أو حساب البنك" required></div><div class="field"><label>ملاحظة</label><input name="note" maxlength="160" placeholder="توضيح اختياري"></div><div class="form-actions"><button class="primary" type="submit">حفظ رصيد السيولة</button><button class="soft-btn" type="button" id="downloadLiquidityPdf">تنزيل سجل السيولة PDF</button></div></form><section class="personal-withdrawals-list"><h4>الأرصدة المسجلة</h4>${rows}</section>`);
     bindClose();
+    const form = document.getElementById('liquidityEntryForm');
+    document.getElementById('downloadLiquidityPdf').onclick = () => {
+      if (!window.downloadDaftariRecordPdf) { toast('ميزة PDF غير جاهزة بعد'); return; }
+      window.downloadDaftariRecordPdf({ title: 'سجل السيولة المستقلة', subtitle: 'أرصدة الخزائن والبنوك · مستقلة عن الديون والتسديدات والسحوبات', fileName: 'سجل-السيولة', sections: [{ title: 'الأرصدة', rows: entries.length ? entries.map(entry => ({ label: `${entry.location || 'خزنة أو بنك'}${entry.note ? ` · ${entry.note}` : ''}`, value: `${fmt(entry.amount)} ${entry.currency || ''}` })) : [{ label: 'الأرصدة', value: 'لا توجد سيولة مسجلة' }] }] });
+      toast('تم تنزيل سجل السيولة بصيغة PDF');
+    };
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const values = new FormData(form);
+      const currency = String(values.get('currency') || '');
+      const amount = Number(normalizeDigits(values.get('amount')).replace(/,/g, ''));
+      const location = String(values.get('location') || '').trim();
+      if (!currencies[currency] || !Number.isFinite(amount) || amount <= 0 || !location) { toast('حدد العملة والمبلغ واسم الخزنة أو البنك'); return; }
+      db.liquidityEntries.unshift({ id: crypto.randomUUID(), currency, amount, location, note: String(values.get('note') || '').trim(), createdAt: new Date().toISOString() });
+      save();
+      refreshCashCards();
+      openCashLiquidity();
+      toast('تم حفظ رصيد السيولة المستقل');
+    });
+    document.querySelectorAll('[data-liquidity-id]').forEach(button => button.addEventListener('click', () => {
+      const id = button.dataset.liquidityId;
+      if (!confirm('حذف رصيد السيولة المحدد؟')) return;
+      db.liquidityEntries = db.liquidityEntries.filter(entry => String(entry.id) !== String(id));
+      save();
+      refreshCashCards();
+      openCashLiquidity();
+    }));
   }
 
   function withdrawalCurrencyOptions() {
@@ -145,9 +168,14 @@
     const totals = currencyTotals(withdrawals, withdrawalTotal);
     const items = withdrawals.slice(0, 30).map(entry => `<button type="button" class="personal-withdrawal-row" data-withdrawal-id="${esc(entry.id)}"><span><strong>${fmt(withdrawalTotal(entry))} ${currencyDisplay(entry.currency || 'USD')}</strong><small>${withdrawalTimestamp(entry)} · ${fmt(withdrawalAmounts(entry).length)} مبالغ${entry.source ? ` · ${esc(entry.source)}` : ''}</small></span><span class="withdrawal-row-arrow" aria-hidden="true">‹</span></button>`).join('') || '<div class="empty">لا توجد سحوبات شخصية مسجلة.</div>';
     const currentTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-    showModal(`<div class="modal-head"><div><h3>السحوبات اليومية</h3><p class="withdrawals-independent-note">سجل مستقل تمامًا عن ديون العملاء وتسديداتهم وأرصدتهم.</p></div>${closeButton()}</div><section class="withdrawals-summary"><span>إجمالي السحوبات المسجلة</span><strong>${formatCurrencyTotals(totals, 'لا توجد سحوبات مسجلة')}</strong><small>${fmt(withdrawals.length)} سحبة مستقلة</small></section><form id="personalWithdrawalForm"><h4>سحب جديد</h4><div class="grid2"><div class="field"><label>العملة أولاً</label><select name="currency" required>${withdrawalCurrencyOptions()}</select></div><div class="field"><label>التاريخ</label><input name="date" type="date" lang="en" dir="ltr" required value="${today()}"></div></div><div class="field withdrawal-amounts-field" data-withdrawal-amounts hidden><label>المبالغ</label><div class="withdrawal-amount-list" data-withdrawal-amount-list></div><small class="muted">يُضاف حقل جديد تلقائيًا بعد إدخال كل مبلغ.</small></div><div class="withdrawal-draft-total" data-withdrawal-draft hidden><span>الإجمالي</span><strong data-withdrawal-draft-total>0</strong><small data-withdrawal-draft-count>0 مبالغ</small></div><div class="grid2"><div class="field"><label>المصدر</label><input name="source" maxlength="100" placeholder="فرع، محفظة، أو مورد (اختياري)"></div><div class="field"><label>الوقت</label><input name="time" type="time" lang="en" dir="ltr" required value="${currentTime}"></div></div><div class="field"><label>ملاحظة</label><input name="note" maxlength="160" placeholder="توضيح إضافي (اختياري)"></div><div class="form-actions"><button class="primary" type="submit" data-withdrawal-submit disabled>إضافة سحب</button></div></form><section class="personal-withdrawals-list"><h4>سجل السحوبات</h4>${items}</section>`);
+    showModal(`<div class="modal-head"><div><h3>السحوبات اليومية</h3><p class="withdrawals-independent-note">سجل مستقل تمامًا عن ديون العملاء وتسديداتهم وأرصدتهم.</p></div>${closeButton()}</div><section class="withdrawals-summary"><span>إجمالي السحوبات المسجلة</span><strong>${formatCurrencyTotals(totals, 'لا توجد سحوبات مسجلة')}</strong><small>${fmt(withdrawals.length)} سحبة مستقلة</small></section><form id="personalWithdrawalForm"><h4>سحب جديد</h4><div class="grid2"><div class="field"><label>العملة أولاً</label><select name="currency" required>${withdrawalCurrencyOptions()}</select></div><div class="field"><label>التاريخ</label><input name="date" type="date" lang="en" dir="ltr" required value="${today()}"></div></div><div class="field withdrawal-amounts-field" data-withdrawal-amounts hidden><label>المبالغ</label><div class="withdrawal-amount-list" data-withdrawal-amount-list></div><small class="muted">يُضاف حقل جديد تلقائيًا بعد إدخال كل مبلغ.</small></div><div class="withdrawal-draft-total" data-withdrawal-draft hidden><span>الإجمالي</span><strong data-withdrawal-draft-total>0</strong><small data-withdrawal-draft-count>0 مبالغ</small></div><div class="grid2"><div class="field"><label>المصدر</label><input name="source" maxlength="100" placeholder="فرع، محفظة، أو مورد (اختياري)"></div><div class="field"><label>الوقت</label><input name="time" type="time" lang="en" dir="ltr" required value="${currentTime}"></div></div><div class="field"><label>ملاحظة</label><input name="note" maxlength="160" placeholder="توضيح إضافي (اختياري)"></div><div class="form-actions"><button class="primary" type="submit" data-withdrawal-submit disabled>إضافة سحب</button><button class="soft-btn" type="button" id="downloadWithdrawalsPdf">تنزيل سجل السحوبات PDF</button></div></form><section class="personal-withdrawals-list"><h4>سجل السحوبات</h4>${items}</section>`);
     bindClose();
     const form = document.getElementById('personalWithdrawalForm');
+    document.getElementById('downloadWithdrawalsPdf').onclick = () => {
+      if (!window.downloadDaftariRecordPdf) { toast('ميزة PDF غير جاهزة بعد'); return; }
+      window.downloadDaftariRecordPdf({ title: 'سجل السحوبات الشخصية', subtitle: 'سجل مستقل تمامًا عن ديون العملاء وتسديداتهم وأرصدتهم', fileName: 'سجل-السحوبات', sections: [{ title: 'السحوبات', rows: withdrawals.length ? withdrawals.map(entry => ({ label: `${withdrawalTimestamp(entry)}${entry.source ? ` · ${entry.source}` : ''}${entry.note ? ` · ${entry.note}` : ''}`, value: `${fmt(withdrawalTotal(entry))} ${entry.currency || ''}` })) : [{ label: 'السحوبات', value: 'لا توجد سحوبات مسجلة' }] }] });
+      toast('تم تنزيل سجل السحوبات بصيغة PDF');
+    };
     const currencyField = form.elements.currency;
     const amountsField = form.querySelector('[data-withdrawal-amounts]');
     const amountList = form.querySelector('[data-withdrawal-amount-list]');
@@ -276,6 +304,7 @@
         clients: Array.isArray(db.clients) ? db.clients : [],
         profits: Array.isArray(db.profits) ? db.profits : [],
         personalWithdrawals: Array.isArray(db.personalWithdrawals) ? db.personalWithdrawals : [],
+        liquidityEntries: Array.isArray(db.liquidityEntries) ? db.liquidityEntries : [],
         trash: Array.isArray(db.trash) ? db.trash : [],
         settings: db.settings && typeof db.settings === 'object' ? db.settings : {}
       }))
@@ -311,6 +340,7 @@
         clients: source.clients,
         profits: source.profits,
         personalWithdrawals: Array.isArray(source.personalWithdrawals) ? source.personalWithdrawals : [],
+        liquidityEntries: Array.isArray(source.liquidityEntries) ? source.liquidityEntries : [],
         trash: Array.isArray(source.trash) ? source.trash : [],
         settings: source.settings && typeof source.settings === 'object' ? source.settings : {}
       };
@@ -324,7 +354,7 @@
   }
 
   function openBackup() {
-    showModal(`<div class="modal-head"><div><h3>النسخة الاحتياطية</h3><p class="backup-modal-note">احتفظ بملف النسخة في مكان آمن، ثم افتحه من جوالك الآخر لاستعادة بيانات الدفتر.</p></div>${closeButton()}</div><section class="backup-info"><strong>ماذا تتضمن النسخة؟</strong><span>العملاء، الديون، التسديدات، السحوبات، إعدادات الصرف، وسلة المحذوفات.</span></section><div class="backup-actions"><button type="button" class="primary" id="downloadBackup">↓ حفظ نسخة احتياطية</button><button type="button" class="soft-btn" id="restoreBackup">↑ استعادة نسخة من ملف</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div><p class="backup-warning">عند الاستعادة تُستبدل بيانات الجهاز الحالية بالملف الذي تختاره.</p>`);
+    showModal(`<div class="modal-head"><div><h3>النسخة الاحتياطية</h3><p class="backup-modal-note">احتفظ بملف النسخة في مكان آمن، ثم افتحه من جوالك الآخر لاستعادة بيانات الدفتر.</p></div>${closeButton()}</div><section class="backup-info"><strong>ماذا تتضمن النسخة؟</strong><span>العملاء، الديون، التسديدات، السيولة المستقلة، السحوبات، إعدادات الصرف، وسلة المحذوفات.</span></section><div class="backup-actions"><button type="button" class="primary" id="downloadBackup">↓ حفظ نسخة احتياطية</button><button type="button" class="soft-btn" id="restoreBackup">↑ استعادة نسخة من ملف</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div><p class="backup-warning">عند الاستعادة تُستبدل بيانات الجهاز الحالية بالملف الذي تختاره.</p>`);
     bindClose();
     document.getElementById('downloadBackup').onclick = downloadBackup;
     const fileInput = document.getElementById('backupFile');
