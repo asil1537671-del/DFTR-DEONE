@@ -51,25 +51,3 @@
     });
   };
 })();
-
-// Load passwordless Supabase authentication for both application entry pages.
-if (!window.__DAFTARI_SUPABASE_LOADER__) {
-  window.__DAFTARI_SUPABASE_LOADER__ = true;
-  const loadScript = source => new Promise((resolve, reject) => {
-    const existing = [...document.scripts].find(script => script.src && script.src.endsWith(source));
-    if (existing) {
-      if (source.includes('supabase-js') ? window.supabase : source === 'supabase-config.js' ? window.DAFTARI_SUPABASE_CONFIG : window.__DAFTARI_AUTH_INITIALIZED__) resolve();
-      else { existing.addEventListener('load', resolve, { once: true }); existing.addEventListener('error', reject, { once: true }); }
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = source;
-    script.onload = resolve;
-    script.onerror = reject;
-    document.body.append(script);
-  });
-  window.__DaftariSupabaseReady = (window.supabase ? Promise.resolve() : loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'))
-    .then(() => window.DAFTARI_SUPABASE_CONFIG ? undefined : loadScript('supabase-config.js'))
-    .then(() => window.__DAFTARI_AUTH_INITIALIZED__ ? undefined : loadScript('supabase-auth.js'))
-    .catch(error => console.warn('Supabase authentication could not be loaded.', error));
-}
