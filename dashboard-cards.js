@@ -14,6 +14,8 @@
     'exchangeSettings',
     'calculatorSettings',
     'analytics-card',
+    'cash-liquidity-card',
+    'personal-withdrawals-card',
     'theme-card'
   ];
 
@@ -40,6 +42,98 @@
   analyticsCard.setAttribute('aria-label', 'فتح التحليل المالي الشامل');
   analyticsCard.addEventListener('click', () => window.openAnalytics?.());
   cards.append(analyticsCard);
+
+  db.personalWithdrawals = Array.isArray(db.personalWithdrawals) ? db.personalWithdrawals : [];
+  const cashCard = document.createElement('button');
+  cashCard.type = 'button';
+  cashCard.id = 'cash-liquidity-card';
+  cashCard.className = 'card cash-liquidity-card';
+  cashCard.innerHTML = '<span class="cash-card-head"><span class="cash-card-icon" aria-hidden="true">▣</span><span><strong>إجمالي السيولة</strong><small>التسديدات بعد السحوبات الشخصية</small></span></span><span class="cash-card-values" data-cash-values>لا توجد سيولة مسجلة</span>';
+  cards.append(cashCard);
+
+  const withdrawalsCard = document.createElement('button');
+  withdrawalsCard.type = 'button';
+  withdrawalsCard.id = 'personal-withdrawals-card';
+  withdrawalsCard.className = 'card personal-withdrawals-card';
+  withdrawalsCard.innerHTML = '<span class="cash-card-head"><span class="withdrawals-card-icon" aria-hidden="true">↗</span><span><strong>السحوبات الشخصية</strong><small>تسجيل ومراجعة السحوبات اليومية</small></span></span><span class="withdrawals-card-total" data-withdrawals-total>0 عملية اليوم</span>';
+  cards.append(withdrawalsCard);
+
+  function currencyTotals(entries, direction) {
+    const totals = {};
+    entries.forEach(entry => {
+      const currency = entry.currency || 'USD';
+      totals[currency] = (totals[currency] || 0) + direction(entry);
+    });
+    return totals;
+  }
+
+  function collectLiquidity() {
+    const payments = [];
+    (db.clients || []).forEach(client => (client.records || []).forEach(record => {
+      if (record.type === 'payment') payments.push(record);
+    }));
+    const collected = currencyTotals(payments, record => Number(record.amount) || 0);
+    const withdrawn = currencyTotals(db.personalWithdrawals || [], entry => Number(entry.amount) || 0);
+    const balances = {};
+    new Set([...Object.keys(collected), ...Object.keys(withdrawn)]).forEach(currency => {
+      balances[currency] = (collected[currency] || 0) - (withdrawn[currency] || 0);
+    });
+    return { collected, withdrawn, balances };
+  }
+
+  function formatCurrencyTotals(totals, empty = 'لا توجد بيانات') {
+    const entries = Object.entries(totals).filter(([, amount]) => Math.abs(amount) > 0.0001);
+    return entries.length ? entries.map(([currency, amount]) => `${fmt(Math.abs(amount))} ${currencyDisplay(currency)}`).join(' · ') : empty;
+  }
+
+  function refreshCashCards() {
+    const liquidity = collectLiquidity();
+    const cashValues = cashCard.querySelector('[data-cash-values]');
+    const netEntries = Object.entries(liquidity.balances).filter(([, amount]) => Math.abs(amount) > 0.0001);
+    cashValues.innerHTML = netEntries.length ? formatCurrencyTotals(liquidity.balances) : 'لا توجد سيولة مسجلة';
+    cashCard.setAttribute('aria-label', `إجمالي السيولة: ${netEntries.length ? netEntries.map(([currency, amount]) => `${fmt(Math.abs(amount))} ${currency}`).join('، ') : 'لا توجد سيولة مسجلة'}`);
+    const currentDay = today();
+    const todayEntries = (db.personalWithdrawals || []).filter(entry => entry.date === currentDay);
+    withdrawalsCard.querySelector('[data-withdrawals-total]').textContent = todayEntries.length ? `${fmt(todayEntries.length)} سحوبات اليوم · ${formatCurrencyTotals(currencyTotals(todayEntries, entry => Number(entry.amount) || 0), '')}` : 'لا توجد سحوبات اليوم';
+  }
+
+  function openCashLiquidity() {
+    const liquidity = collectLiquidity();
+    const rows = Object.keys(liquidity.balances).sort().map(currency => `<div class="cash-liquidity-row"><span>${currencyDisplay(currency)}</span><b>${fmt(liquidity.collected[currency] || 0)}</b><b>${fmt(liquidity.withdrawn[currency] || 0)}</b><strong>${fmt(liquidity.balances[currency] || 0)}</strong></div>`).join('') || '<div class="empty">لا توجد تسديدات أو سحوبات مسجلة حتى الآن.</div>';
+    showModal(`<div class="modal-head"><h3>إجمالي السيولة</h3>${closeButton()}</div><p class="cash-modal-note">تُحسب السيولة من التسديدات المسجلة بعد خصم السحوبات الشخصية.</p><div class="cash-liquidity-table"><div class="cash-liquidity-row cash-liquidity-header"><span>العملة</span><b>التسديدات</b><b>السحوبات</b><strong>المتاح</strong></div>${rows}</div>`);
+    bindClose();
+  }
+
+  function openPersonalWithdrawals() {
+    const withdrawals = [...(db.personalWithdrawals || [])].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    const items = withdrawals.slice(0, 30).map(entry => `<div class="personal-withdrawal-row"><span><strong>${fmt(entry.amount)} ${currencyDisplay(entry.currency || 'USD')}</strong><small>${niceDate(entry.date)}${entry.note ? ` · ${esc(entry.note)}` : ''}</small></span><button type="button" class="soft-btn" data-withdrawal-delete="${esc(entry.id)}">حذف</button></div>`).join('') || '<div class="empty">لا توجد سحوبات شخصية مسجلة.</div>';
+    showModal(`<div class="modal-head"><h3>السحوبات الشخصية</h3>${closeButton()}</div><form id="personalWithdrawalForm"><div class="grid2"><div class="field"><label>المبلغ</label><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required placeholder="0.00"></div><div class="field"><label>العملة</label><select name="currency"><option value="SAR">🇸🇦 ريال سعودي</option><option value="USD">🇺🇸 دولار أمريكي</option><option value="YER">🇾🇪 ريال يمني</option><option value="USDT">₮ USDT</option></select></div></div><div class="field"><label>ملاحظة</label><input name="note" maxlength="160" placeholder="سبب السحب (اختياري)"></div><div class="field"><label>التاريخ</label><input name="date" type="date" lang="en" dir="ltr" required value="${today()}"></div><div class="form-actions"><button class="primary" type="submit">تسجيل السحب</button></div></form><section class="personal-withdrawals-list"><h4>آخر السحوبات</h4>${items}</section>`);
+    bindClose();
+    document.getElementById('personalWithdrawalForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const values = new FormData(event.currentTarget);
+      const amount = Number(String(values.get('amount') || '').replace(/,/g, ''));
+      const currency = String(values.get('currency') || 'USD');
+      if (!Number.isFinite(amount) || amount <= 0 || !currencies[currency]) { toast('تحقق من المبلغ والعملة'); return; }
+      db.personalWithdrawals.unshift({ id: crypto.randomUUID(), amount, currency, note: String(values.get('note') || '').trim(), date: String(values.get('date') || today()), createdAt: new Date().toISOString() });
+      save();
+      refreshCashCards();
+      openPersonalWithdrawals();
+      toast('تم تسجيل السحب الشخصي');
+    });
+    document.querySelectorAll('[data-withdrawal-delete]').forEach(button => button.addEventListener('click', () => {
+      const id = button.dataset.withdrawalDelete;
+      db.personalWithdrawals = db.personalWithdrawals.filter(entry => String(entry.id) !== String(id));
+      save();
+      refreshCashCards();
+      openPersonalWithdrawals();
+      toast('تم حذف السحب');
+    }));
+  }
+
+  cashCard.addEventListener('click', openCashLiquidity);
+  withdrawalsCard.addEventListener('click', openPersonalWithdrawals);
+  refreshCashCards();
 
   const themeCard = document.createElement('button');
   themeCard.type = 'button';
@@ -167,7 +261,7 @@
 
   refreshAnalyticsCard();
   const recentList = document.getElementById('recentList');
-  if (recentList) new MutationObserver(refreshAnalyticsCard).observe(recentList, { childList: true, subtree: true, characterData: true });
+  if (recentList) new MutationObserver(() => { refreshAnalyticsCard(); refreshCashCards(); }).observe(recentList, { childList: true, subtree: true, characterData: true });
 
   const allCards = () => Array.from(cards.children).filter(card => card.classList.contains('card'));
   const cardId = card => card.id || card.dataset.dashboardCardId;
