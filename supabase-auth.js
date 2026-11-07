@@ -1,6 +1,5 @@
 (() => {
   if (window.__DAFTARI_AUTH_INITIALIZED__) return;
-  window.__DAFTARI_AUTH_INITIALIZED__ = true;
   if (!document.querySelector('link[data-daftari-auth-style]')) {
     const stylesheet = document.createElement('link');
     stylesheet.rel = 'stylesheet';
@@ -18,8 +17,19 @@
 
   if (!config?.url || !config?.publishableKey || !window.supabase?.createClient) {
     console.warn('Supabase Auth is not available.');
+    const showUnavailableMessage = () => {
+      if (document.querySelector('#daftariAuthUnavailable')) return;
+      const message = document.createElement('section');
+      message.className = 'daftari-auth-layer';
+      message.id = 'daftariAuthUnavailable';
+      message.innerHTML = '<div class="daftari-auth-card" role="alert"><div class="daftari-auth-mark" aria-hidden="true">د</div><h2>تعذر تحميل خدمة الدخول</h2><p>تأكد من اتصال الإنترنت، ثم أعد تحميل الصفحة. شغّل التطبيق دائمًا من الرابط المحلي وليس من ملف مباشر.</p><a class="daftari-auth-retry" href="http://127.0.0.1:8765/">فتح التطبيق المحلي</a></div>';
+      document.body.append(message);
+    };
+    if (document.body) showUnavailableMessage();
+    else document.addEventListener('DOMContentLoaded', showUnavailableMessage, { once: true });
     return;
   }
+  window.__DAFTARI_AUTH_INITIALIZED__ = true;
 
   const client = window.supabase.createClient(config.url, config.publishableKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
