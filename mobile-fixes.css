@@ -190,6 +190,16 @@ body[data-theme="dark"] .app-attribution{border-color:var(--line);color:var(--mu
 .withdrawal-detail-meta dt{margin-bottom:4px;color:var(--muted);font-size:11px}
 .withdrawal-detail-meta dd{margin:0;overflow-wrap:anywhere;font-size:13px}
 .danger{border:1px solid #e6aaa0!important;background:#fff0ee!important;color:#b34235!important}
+.backup-card{min-height:145px;display:flex;align-items:center;gap:15px;padding:19px!important;border:1px solid #c5d8f1!important;background:linear-gradient(135deg,#f1f7ff,#e4efff)!important;color:#215a93;text-align:right;font:inherit;cursor:pointer;transition:transform .16s,box-shadow .16s}
+.backup-card:hover{transform:translateY(-2px);box-shadow:0 15px 32px #245d941c}
+.backup-card-icon{display:grid;width:52px;height:52px;flex:0 0 auto;place-items:center;border-radius:16px;background:#fff;color:#2d73bd;font-size:28px;font-weight:900;box-shadow:0 7px 17px #245d9417}
+.backup-card-copy{display:flex;min-width:0;flex-direction:column;gap:4px}
+.backup-card-copy strong{font-size:18px;font-weight:800}
+.backup-card-copy small{color:var(--muted);font-size:11px;line-height:1.55}
+.backup-modal-note{margin:3px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+.backup-info{display:grid;gap:6px;margin:4px 0 16px;padding:14px;border:1px solid #c5d8f1;border-radius:15px;background:#f4f8ff;color:#315f92}
+.backup-info strong{font-size:14px}.backup-info span,.backup-warning{color:var(--muted);font-size:12px;line-height:1.65}
+.backup-actions{display:grid;gap:10px}.backup-actions button{min-height:50px}.backup-warning{margin:14px 0 0}
 body[data-theme="dark"] .cash-liquidity-card{background:linear-gradient(135deg,#203d31,#193126)!important;border-color:#46735b!important}
 body[data-theme="dark"] .personal-withdrawals-card{background:linear-gradient(135deg,#422f28,#34231f)!important;border-color:#775344!important}
 body[data-theme="dark"] .cash-card-head strong,body[data-theme="dark"] .cash-card-values{color:#a4e6c2}
@@ -199,4 +209,7 @@ body[data-theme="dark"] .withdrawals-summary,body[data-theme="dark"] .withdrawal
 body[data-theme="dark"] .withdrawals-summary strong,body[data-theme="dark"] .withdrawal-draft-total strong,body[data-theme="dark"] .withdrawal-detail-total strong{color:#ffc3a6}
 body[data-theme="dark"] .personal-withdrawal-row:hover{background:#2a2926}
 body[data-theme="dark"] .withdrawal-detail-total{background:linear-gradient(135deg,#422f28,#34231f);border-color:#775344}
+body[data-theme="dark"] .backup-card{background:linear-gradient(135deg,#223447,#1b2a3a)!important;border-color:#466987!important;color:#c6e3ff}
+body[data-theme="dark"] .backup-card-icon{background:#1b2734;color:#91c9ff}
+body[data-theme="dark"] .backup-info{border-color:#466987;background:#1e3041;color:#c6e3ff}
 @media(max-width:600px){.cash-liquidity-card,.personal-withdrawals-card{min-height:142px;padding:16px!important}.cash-liquidity-row{grid-template-columns:1.15fr repeat(3,minmax(66px,1fr));padding:10px 8px;font-size:11px}.cash-liquidity-header{font-size:10px}.cash-card-values,.withdrawals-card-total{font-size:14px}}

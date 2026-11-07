@@ -16,6 +16,7 @@
     'analytics-card',
     'cash-liquidity-card',
     'personal-withdrawals-card',
+    'backup-card',
     'theme-card'
   ];
 
@@ -255,6 +256,81 @@
   }
   syncThemeCard();
   new MutationObserver(syncThemeCard).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+
+  const backupCard = document.createElement('button');
+  backupCard.type = 'button';
+  backupCard.id = 'backup-card';
+  backupCard.className = 'card backup-card';
+  backupCard.innerHTML = '<span class="backup-card-icon" aria-hidden="true">⇄</span><span class="backup-card-copy"><strong>النسخة الاحتياطية</strong><small>حفظ بياناتك ونقلها إلى جوال آخر</small></span>';
+  backupCard.setAttribute('aria-label', 'فتح النسخة الاحتياطية');
+  backupCard.addEventListener('click', openBackup);
+  cards.append(backupCard);
+
+  function backupPayload() {
+    return {
+      app: 'دفتري',
+      format: 'daftari-backup',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: JSON.parse(JSON.stringify({
+        clients: Array.isArray(db.clients) ? db.clients : [],
+        profits: Array.isArray(db.profits) ? db.profits : [],
+        personalWithdrawals: Array.isArray(db.personalWithdrawals) ? db.personalWithdrawals : [],
+        trash: Array.isArray(db.trash) ? db.trash : [],
+        settings: db.settings && typeof db.settings === 'object' ? db.settings : {}
+      }))
+    };
+  }
+
+  function downloadBackup() {
+    const backup = backupPayload();
+    const file = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `daftari-backup-${today()}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('تم حفظ ملف النسخة الاحتياطية');
+  }
+
+  function restoreBackup(file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast('ملف النسخة الاحتياطية كبير جدًا'); return; }
+    const reader = new FileReader();
+    reader.onerror = () => toast('تعذر قراءة ملف النسخة الاحتياطية');
+    reader.onload = () => {
+      let parsed;
+      try { parsed = JSON.parse(String(reader.result || '')); } catch (_) { toast('هذا الملف ليس نسخة احتياطية صالحة'); return; }
+      const source = parsed?.format === 'daftari-backup' ? parsed.data : parsed;
+      if (!source || typeof source !== 'object' || !Array.isArray(source.clients) || !Array.isArray(source.profits)) { toast('هذا الملف لا يحتوي على بيانات دفتري صالحة'); return; }
+      if (!confirm('سيتم استبدال بيانات هذا الجهاز بالكامل ببيانات النسخة الاحتياطية. هل تريد المتابعة؟')) return;
+      db = {
+        clients: source.clients,
+        profits: source.profits,
+        personalWithdrawals: Array.isArray(source.personalWithdrawals) ? source.personalWithdrawals : [],
+        trash: Array.isArray(source.trash) ? source.trash : [],
+        settings: source.settings && typeof source.settings === 'object' ? source.settings : {}
+      };
+      save();
+      refreshCashCards();
+      refreshAnalyticsCard();
+      closeModal();
+      toast('تمت استعادة النسخة الاحتياطية بنجاح');
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  function openBackup() {
+    showModal(`<div class="modal-head"><div><h3>النسخة الاحتياطية</h3><p class="backup-modal-note">احتفظ بملف النسخة في مكان آمن، ثم افتحه من جوالك الآخر لاستعادة بيانات الدفتر.</p></div>${closeButton()}</div><section class="backup-info"><strong>ماذا تتضمن النسخة؟</strong><span>العملاء، الديون، التسديدات، السحوبات، إعدادات الصرف، وسلة المحذوفات.</span></section><div class="backup-actions"><button type="button" class="primary" id="downloadBackup">↓ حفظ نسخة احتياطية</button><button type="button" class="soft-btn" id="restoreBackup">↑ استعادة نسخة من ملف</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div><p class="backup-warning">عند الاستعادة تُستبدل بيانات الجهاز الحالية بالملف الذي تختاره.</p>`);
+    bindClose();
+    document.getElementById('downloadBackup').onclick = downloadBackup;
+    const fileInput = document.getElementById('backupFile');
+    document.getElementById('restoreBackup').onclick = () => fileInput.click();
+    fileInput.onchange = () => restoreBackup(fileInput.files?.[0]);
+  }
 
   function collectAnalytics() {
     const currenciesByKey = new Map();
