@@ -123,10 +123,37 @@
     showModal(`<div class="modal-head"><div><h3>إجمالي السيولة</h3><p class="cash-modal-note">أرصدة تُدخلها يدويًا للخزائن والبنوك، وهي مستقلة تمامًا عن الديون والتسديدات والسحوبات.</p></div>${closeButton()}</div><section class="withdrawals-summary"><span>إجمالي الأرصدة المسجلة</span><strong>${totals}</strong><small>${fmt(entries.length)} رصيد مستقل</small></section><form id="liquidityEntryForm"><h4>إضافة رصيد سيولة</h4><div class="grid2"><div class="field"><label>العملة</label><select name="currency" required>${withdrawalCurrencyOptions()}</select></div><div class="field"><label>المبلغ</label><input name="amount" type="text" inputmode="decimal" lang="en" dir="ltr" autocomplete="off" placeholder="0.00" required></div></div><div class="field"><label>الخزنة أو البنك</label><input name="location" maxlength="100" placeholder="مثال: خزنة المكتب أو حساب البنك" required></div><div class="field"><label>ملاحظة</label><input name="note" maxlength="160" placeholder="توضيح اختياري"></div><div class="form-actions"><button class="primary" type="submit">حفظ رصيد السيولة</button><button class="soft-btn" type="button" id="downloadLiquidityPdf">تنزيل سجل السيولة PDF</button></div></form><section class="personal-withdrawals-list"><h4>الأرصدة المسجلة</h4>${rows}</section>`);
     bindClose();
     const form = document.getElementById('liquidityEntryForm');
+    // The cash ledger can be viewed as one chosen currency while retaining
+    // every original entry in its own currency.
+    db.settings = db.settings || {};
+    const displayOptions = ['USD', 'SAR', 'YER', 'USDT'].filter(code => currencies[code]);
+    const displayField = document.createElement('div');
+    displayField.className = 'field liquidity-display-currency';
+    displayField.innerHTML = `<label>عرض إجمالي السيولة بعملة</label><select>${displayOptions.map(code => `<option value="${code}" ${code === (db.settings.liquidityDisplayCurrency || 'USD') ? 'selected' : ''}>${currencies[code]}</option>`).join('')}</select><small class="muted">يمكنك تغيير عملة العرض في أي وقت؛ لا تتغير أرصدة المحافظ والبنوك الأصلية.</small><strong></strong>`;
+    form.before(displayField);
+    const displaySelect = displayField.querySelector('select');
+    const showLiquidityTotal = () => {
+      const currency = displaySelect.value;
+      const rates = db.settings.exchangeRatesByType?.debt || db.settings.exchangeRates || {};
+      const rate = code => Number(rates[code]) || (code === 'SAR' ? 3.8 : code === 'YER' ? 535 : 1);
+      const asUsd = Object.entries(liquidity).reduce((sum, [code, amount]) => sum + Number(amount || 0) / rate(code), 0);
+      displayField.querySelector('strong').textContent = `الإجمالي المتاح: ${fmt(asUsd * rate(currency))} ${currencyDisplay(currency)}`;
+    };
+    displaySelect.addEventListener('change', () => {
+      db.settings.liquidityDisplayCurrency = displaySelect.value;
+      save();
+      showLiquidityTotal();
+    });
+    showLiquidityTotal();
     document.getElementById('downloadLiquidityPdf').onclick = () => {
       if (!window.downloadDaftariRecordPdf) { toast('ميزة PDF غير جاهزة بعد'); return; }
-      window.downloadDaftariRecordPdf({ title: 'سجل السيولة المستقلة', subtitle: 'أرصدة الخزائن والبنوك · مستقلة عن الديون والتسديدات والسحوبات', fileName: 'سجل-السيولة', sections: [{ title: 'الأرصدة', rows: entries.length ? entries.map(entry => ({ label: `${entry.location || 'خزنة أو بنك'}${entry.note ? ` · ${entry.note}` : ''}`, value: `${fmt(entry.amount)} ${entry.currency || ''}` })) : [{ label: 'الأرصدة', value: 'لا توجد سيولة مسجلة' }] }] });
-      toast('تم تنزيل سجل السيولة بصيغة PDF');
+      window.openDaftariPdfPeriodChooser({
+        title: 'تنزيل سجل السيولة PDF', entries,
+        onDownload: (selected, period) => {
+          window.downloadDaftariRecordPdf({ title: 'سجل السيولة المستقلة', subtitle: `أرصدة الخزائن والبنوك · مستقلة عن الديون والتسديدات والسحوبات · ${period.label}`, fileName: `سجل-السيولة-${period.fileSuffix}`, sections: [{ title: 'الأرصدة', rows: selected.length ? selected.map(entry => ({ label: `${entry.location || 'خزنة أو بنك'}${entry.note ? ` · ${entry.note}` : ''}`, value: `${fmt(entry.amount)} ${entry.currency || ''}` })) : [{ label: 'الأرصدة', value: 'لا توجد سيولة في الفترة المحددة' }] }] });
+          toast('تم تنزيل سجل السيولة بصيغة PDF');
+        }
+      });
     };
     form.addEventListener('submit', event => {
       event.preventDefault();
@@ -169,12 +196,20 @@
     const items = withdrawals.slice(0, 30).map(entry => `<button type="button" class="personal-withdrawal-row" data-withdrawal-id="${esc(entry.id)}"><span><strong>${fmt(withdrawalTotal(entry))} ${currencyDisplay(entry.currency || 'USD')}</strong><small>${withdrawalTimestamp(entry)} · ${fmt(withdrawalAmounts(entry).length)} مبالغ${entry.source ? ` · ${esc(entry.source)}` : ''}</small></span><span class="withdrawal-row-arrow" aria-hidden="true">‹</span></button>`).join('') || '<div class="empty">لا توجد سحوبات شخصية مسجلة.</div>';
     const currentTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
     showModal(`<div class="modal-head"><div><h3>السحوبات اليومية</h3><p class="withdrawals-independent-note">سجل مستقل تمامًا عن ديون العملاء وتسديداتهم وأرصدتهم.</p></div>${closeButton()}</div><section class="withdrawals-summary"><span>إجمالي السحوبات المسجلة</span><strong>${formatCurrencyTotals(totals, 'لا توجد سحوبات مسجلة')}</strong><small>${fmt(withdrawals.length)} سحبة مستقلة</small></section><form id="personalWithdrawalForm"><h4>سحب جديد</h4><div class="grid2"><div class="field"><label>العملة أولاً</label><select name="currency" required>${withdrawalCurrencyOptions()}</select></div><div class="field"><label>التاريخ</label><input name="date" type="date" lang="en" dir="ltr" required value="${today()}"></div></div><div class="field withdrawal-amounts-field" data-withdrawal-amounts hidden><label>المبالغ</label><div class="withdrawal-amount-list" data-withdrawal-amount-list></div><small class="muted">يُضاف حقل جديد تلقائيًا بعد إدخال كل مبلغ.</small></div><div class="withdrawal-draft-total" data-withdrawal-draft hidden><span>الإجمالي</span><strong data-withdrawal-draft-total>0</strong><small data-withdrawal-draft-count>0 مبالغ</small></div><div class="grid2"><div class="field"><label>المصدر</label><input name="source" maxlength="100" placeholder="فرع، محفظة، أو مورد (اختياري)"></div><div class="field"><label>الوقت</label><input name="time" type="time" lang="en" dir="ltr" required value="${currentTime}"></div></div><div class="field"><label>ملاحظة</label><input name="note" maxlength="160" placeholder="توضيح إضافي (اختياري)"></div><div class="form-actions"><button class="primary" type="submit" data-withdrawal-submit disabled>إضافة سحب</button><button class="soft-btn" type="button" id="downloadWithdrawalsPdf">تنزيل سجل السحوبات PDF</button></div></form><section class="personal-withdrawals-list"><h4>سجل السحوبات</h4>${items}</section>`);
+    document.getElementById('modal').classList.add('fullscreen-modal', 'personal-withdrawals-modal');
+    document.getElementById('overlay').classList.add('fullscreen');
     bindClose();
     const form = document.getElementById('personalWithdrawalForm');
     document.getElementById('downloadWithdrawalsPdf').onclick = () => {
       if (!window.downloadDaftariRecordPdf) { toast('ميزة PDF غير جاهزة بعد'); return; }
-      window.downloadDaftariRecordPdf({ title: 'سجل السحوبات الشخصية', subtitle: 'سجل مستقل تمامًا عن ديون العملاء وتسديداتهم وأرصدتهم', fileName: 'سجل-السحوبات', sections: [{ title: 'السحوبات', rows: withdrawals.length ? withdrawals.map(entry => ({ label: `${withdrawalTimestamp(entry)}${entry.source ? ` · ${entry.source}` : ''}${entry.note ? ` · ${entry.note}` : ''}`, value: `${fmt(withdrawalTotal(entry))} ${entry.currency || ''}` })) : [{ label: 'السحوبات', value: 'لا توجد سحوبات مسجلة' }] }] });
-      toast('تم تنزيل سجل السحوبات بصيغة PDF');
+      window.openDaftariPdfPeriodChooser({
+        title: 'تنزيل سجل السحوبات PDF', entries: withdrawals,
+        getDate: entry => entry.date, getTime: withdrawalTime,
+        onDownload: (selected, period) => {
+          window.downloadDaftariRecordPdf({ title: 'سجل السحوبات الشخصية', subtitle: `سجل مستقل تمامًا عن ديون العملاء وتسديداتهم وأرصدتهم · ${period.label}`, fileName: `سجل-السحوبات-${period.fileSuffix}`, sections: [{ title: 'السحوبات', rows: selected.length ? selected.map(entry => ({ label: `${withdrawalTimestamp(entry)}${entry.source ? ` · ${entry.source}` : ''}${entry.note ? ` · ${entry.note}` : ''}`, value: `${fmt(withdrawalTotal(entry))} ${entry.currency || ''}` })) : [{ label: 'السحوبات', value: 'لا توجد سحوبات في الفترة المحددة' }] }] });
+          toast('تم تنزيل سجل السحوبات بصيغة PDF');
+        }
+      });
     };
     const currencyField = form.elements.currency;
     const amountsField = form.querySelector('[data-withdrawal-amounts]');
@@ -250,6 +285,8 @@
     const amounts = withdrawalAmounts(entry);
     const amountRows = amounts.map((amount, index) => `<li><span>${fmt(index + 1)}</span><strong>${fmt(amount)} ${currencyDisplay(entry.currency || 'USD')}</strong></li>`).join('');
     showModal(`<div class="modal-head"><div><h3>تفاصيل السحب</h3><p class="withdrawals-independent-note">عملية مستقلة ولا تؤثر في أرصدة أو ديون العملاء.</p></div>${closeButton()}</div><section class="withdrawal-detail-total"><span>إجمالي السحب</span><strong>${fmt(withdrawalTotal(entry))} ${currencyDisplay(entry.currency || 'USD')}</strong><small>${withdrawalTimestamp(entry)} · ${fmt(amounts.length)} مبالغ</small></section><section class="withdrawal-detail-list"><h4>المبالغ المضمنة</h4><ol>${amountRows}</ol></section><dl class="withdrawal-detail-meta"><div><dt>المصدر</dt><dd>${entry.source ? esc(entry.source) : 'غير محدد'}</dd></div><div><dt>الملاحظة</dt><dd>${entry.note ? esc(entry.note) : 'لا توجد ملاحظة'}</dd></div></dl><div class="form-actions"><button type="button" class="soft-btn" id="withdrawalBack">العودة للسجل</button><button type="button" class="danger" id="withdrawalDelete">حذف السحب</button></div>`);
+    document.getElementById('modal').classList.add('fullscreen-modal', 'personal-withdrawals-modal');
+    document.getElementById('overlay').classList.add('fullscreen');
     bindClose();
     document.getElementById('withdrawalBack').onclick = openPersonalWithdrawals;
     document.getElementById('withdrawalDelete').onclick = () => {
@@ -298,7 +335,7 @@
     return {
       app: 'دفتري',
       format: 'daftari-backup',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       data: JSON.parse(JSON.stringify({
         clients: Array.isArray(db.clients) ? db.clients : [],
@@ -354,7 +391,7 @@
   }
 
   function openBackup() {
-    showModal(`<div class="modal-head"><div><h3>النسخة الاحتياطية</h3><p class="backup-modal-note">احتفظ بملف النسخة في مكان آمن، ثم افتحه من جوالك الآخر لاستعادة بيانات الدفتر.</p></div>${closeButton()}</div><section class="backup-info"><strong>ماذا تتضمن النسخة؟</strong><span>العملاء، الديون، التسديدات، السيولة المستقلة، السحوبات، إعدادات الصرف، وسلة المحذوفات.</span></section><div class="backup-actions"><button type="button" class="primary" id="downloadBackup">↓ حفظ نسخة احتياطية</button><button type="button" class="soft-btn" id="restoreBackup">↑ استعادة نسخة من ملف</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div><p class="backup-warning">عند الاستعادة تُستبدل بيانات الجهاز الحالية بالملف الذي تختاره.</p>`);
+    showModal(`<div class="modal-head"><div><h3>النسخة الاحتياطية</h3><p class="backup-modal-note">احتفظ بملف النسخة في مكان آمن، ثم افتحه من جوالك الآخر لاستعادة بيانات الدفتر والمستخدم المرتبط بها.</p></div>${closeButton()}</div><section class="backup-info"><strong>ماذا تتضمن النسخة؟</strong><span>بيانات المستخدم، العملاء، الديون، التسديدات، السيولة المستقلة، السحوبات، إعدادات الصرف، وسلة المحذوفات.</span></section><div class="backup-actions"><button type="button" class="primary" id="downloadBackup">↓ حفظ نسخة احتياطية</button><button type="button" class="soft-btn" id="restoreBackup">↑ استعادة نسخة من ملف</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div><p class="backup-warning">عند الاستعادة تُستبدل بيانات الجهاز الحالية بالملف الذي تختاره.</p>`);
     bindClose();
     document.getElementById('downloadBackup').onclick = downloadBackup;
     const fileInput = document.getElementById('backupFile');
@@ -429,6 +466,9 @@
 
   function openAnalytics() {
     const summary = collectAnalytics();
+    const systemTransactions = (db.clients || []).flatMap(client => (client.records || []).map(record => ({ client, record })))
+      .sort((a, b) => String(b.record.date || '').localeCompare(String(a.record.date || '')) || String(b.record.createdAt || '').localeCompare(String(a.record.createdAt || '')));
+    const systemPdfButton = '<div class="form-actions analytics-pdf-action"><button type="button" class="soft-btn" id="downloadSystemTransactionsPdf">تنزيل سجل معاملات النظام PDF</button></div>';
     const currencyRows = summary.currencies
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([currency, values]) => {
@@ -447,11 +487,22 @@
       return `<button type="button" class="analytics-movement ${isPayment ? 'is-payment' : 'is-debt'}" data-analytics-client="${identifier}"><span><strong>${esc(client.name)} · ${label}</strong><small>${esc(date)}${record.note ? ` · ${esc(record.note)}` : ''}</small></span><b>${sign} ${fmt(record.amount)} ${currencyDisplay(record.currency || 'USD')}<small>${fmt(recordUsd(client, record))} USD</small></b></button>`;
     }).join('') || '<div class="analytics-empty">لا توجد حركة ديون أو تسديدات خلال آخر 24 ساعة.</div>';
 
-    showModal(`<div class="modal-head analytics-modal-head"><div><h3>التحليل المالي الشامل</h3><p>إجماليات وحركة جميع العملاء</p></div>${closeButton()}</div><div class="analytics-kpis"><div><small>إجمالي العملاء</small><strong>${fmt(summary.clientCount)}</strong></div><div><small>العملاء المدينون</small><strong>${fmt(summary.debtorCount)}</strong></div><div><small>عمليات إضافة الدين</small><strong>${fmt(summary.debtCount)}</strong></div><div><small>عمليات التسديد</small><strong>${fmt(summary.paymentCount)}</strong></div></div><section class="analytics-usd-summary"><h4>الإجماليات · ما يعادل الدولار</h4><div><span>إجمالي الديون</span><strong>${fmt(summary.debtUsd)} USD</strong></div><div><span>إجمالي التسديدات</span><strong>${fmt(summary.paymentUsd)} USD</strong></div><div class="analytics-net"><span>${summary.balanceUsd >= 0 ? 'الرصيد المستحق' : 'صافي الرصيد الدائن'}</span><strong>${fmt(Math.abs(summary.balanceUsd))} USD</strong></div></section><section class="analytics-currency-section"><h4>التفصيل حسب العملة</h4><div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th>العملة</th><th>الديون</th><th>التسديدات</th><th>الرصيد</th><th>الأرباح</th></tr></thead><tbody>${currencyRows || '<tr><td colspan="5" class="analytics-empty">لا توجد عمليات مسجلة.</td></tr>'}</tbody></table></div></section><section class="analytics-movement-section"><h4>حركة الديون والتسديدات · آخر 24 ساعة</h4><div class="analytics-movements">${movementRows}</div></section>`);
+    showModal(`<div class="modal-head analytics-modal-head"><div><h3>التحليل المالي الشامل</h3><p>إجماليات وحركة جميع العملاء</p></div>${closeButton()}</div><div class="analytics-kpis"><div><small>إجمالي العملاء</small><strong>${fmt(summary.clientCount)}</strong></div><div><small>العملاء المدينون</small><strong>${fmt(summary.debtorCount)}</strong></div><div><small>عمليات إضافة الدين</small><strong>${fmt(summary.debtCount)}</strong></div><div><small>عمليات التسديد</small><strong>${fmt(summary.paymentCount)}</strong></div></div>${systemPdfButton}<section class="analytics-usd-summary"><h4>الإجماليات · ما يعادل الدولار</h4><div><span>إجمالي الديون</span><strong>${fmt(summary.debtUsd)} USD</strong></div><div><span>إجمالي التسديدات</span><strong>${fmt(summary.paymentUsd)} USD</strong></div><div class="analytics-net"><span>${summary.balanceUsd >= 0 ? 'الرصيد المستحق' : 'صافي الرصيد الدائن'}</span><strong>${fmt(Math.abs(summary.balanceUsd))} USD</strong></div></section><section class="analytics-currency-section"><h4>التفصيل حسب العملة</h4><div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th>العملة</th><th>الديون</th><th>التسديدات</th><th>الرصيد</th><th>الأرباح</th></tr></thead><tbody>${currencyRows || '<tr><td colspan="5" class="analytics-empty">لا توجد عمليات مسجلة.</td></tr>'}</tbody></table></div></section><section class="analytics-movement-section"><h4>حركة الديون والتسديدات · آخر 24 ساعة</h4><div class="analytics-movements">${movementRows}</div></section>`);
     const modal = document.getElementById('modal');
     modal.classList.add('fullscreen-modal', 'analytics-modal');
     document.getElementById('overlay').classList.add('fullscreen');
     bindClose();
+    document.getElementById('downloadSystemTransactionsPdf').onclick = () => {
+      if (!window.openDaftariPdfPeriodChooser || !window.downloadDaftariRecordPdf) { toast('ميزة PDF غير جاهزة بعد'); return; }
+      window.openDaftariPdfPeriodChooser({
+        title: 'تنزيل سجل معاملات النظام PDF', entries: systemTransactions,
+        getDate: item => item.record.date, getTime: item => item.record.createdAt ? new Date(item.record.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+        onDownload: (selected, period) => {
+          window.downloadDaftariRecordPdf({ title: 'سجل معاملات النظام', subtitle: `جميع ديون وتسديدات العملاء · ${period.label}`, fileName: `سجل-معاملات-النظام-${period.fileSuffix}`, sections: [{ title: 'المعاملات', rows: selected.length ? selected.map(({ client, record }) => ({ label: `${client.name} · ${record.type === 'payment' ? 'تسديد' : 'إضافة دين'} · ${niceDate(record.date)}${record.note ? ` · ${record.note}` : ''}`, value: `${record.type === 'payment' ? '−' : '+'} ${fmt(record.amount)} ${record.currency || ''}` })) : [{ label: 'المعاملات', value: 'لا توجد عمليات في الفترة المحددة' }] }] });
+          toast('تم تنزيل سجل معاملات النظام بصيغة PDF');
+        }
+      });
+    };
     document.querySelectorAll('[data-analytics-client]').forEach(button => {
       button.addEventListener('click', () => {
         const clientId = button.dataset.analyticsClient;

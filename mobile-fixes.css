@@ -3,6 +3,22 @@ html {
   overscroll-behavior-y: contain;
 }
 
+/* Final app-shell rules: this file loads last, so no legacy mobile rule can
+   place page content, a modal, or the calculator beneath the fixed navigation. */
+:root{--dftr-nav-height:94px}
+body:has(.dftr-bottom-nav) .app{min-height:100dvh;padding-bottom:calc(var(--dftr-nav-height) + env(safe-area-inset-bottom))!important}
+body:has(.dftr-bottom-nav) .dftr-bottom-nav{position:fixed!important;z-index:90!important;right:0!important;bottom:0!important;left:0!important;height:var(--dftr-nav-height)!important;min-height:var(--dftr-nav-height)!important;margin:0!important;border-radius:0!important;background:#fffcf6!important;backdrop-filter:none!important;box-shadow:0 -8px 24px #332c1b12!important}
+body:has(.dftr-bottom-nav)>.overlay.show{top:0!important;right:0!important;bottom:var(--dftr-nav-height)!important;left:0!important;height:auto!important;overscroll-behavior:contain}
+body:has(.dftr-bottom-nav)>.overlay.show>.modal{max-height:calc(100% - 24px)!important}
+body:has(.dftr-bottom-nav)>.overlay.show>.modal.fullscreen-modal{width:100%!important;height:100%!important;min-height:0!important;max-height:100%!important;overflow:auto!important;overscroll-behavior:contain}
+body:has(.dftr-bottom-nav) .calc{z-index:88!important;bottom:calc(var(--dftr-nav-height) + 12px)!important}
+body:has(.dftr-bottom-nav) .calc-box{max-height:calc(100dvh - var(--dftr-nav-height) - 28px)!important}
+
+@media (min-width:801px) {
+  body:has(.dftr-bottom-nav) .app{padding-inline:clamp(26px,4vw,64px)!important}
+  body:has(.dftr-bottom-nav) .dftr-bottom-nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;padding-inline:max(10vw,32px)!important}
+}
+
 html.dftr-restoring body {
   visibility: hidden;
 }
@@ -213,3 +229,33 @@ body[data-theme="dark"] .backup-card{background:linear-gradient(135deg,#223447,#
 body[data-theme="dark"] .backup-card-icon{background:#1b2734;color:#91c9ff}
 body[data-theme="dark"] .backup-info{border-color:#466987;background:#1e3041;color:#c6e3ff}
 @media(max-width:600px){.cash-liquidity-card,.personal-withdrawals-card{min-height:142px;padding:16px!important}.cash-liquidity-row{grid-template-columns:1.15fr repeat(3,minmax(66px,1fr));padding:10px 8px;font-size:11px}.cash-liquidity-header{font-size:10px}.cash-card-values,.withdrawals-card-total{font-size:14px}}
+
+/* Phone-sized desktop shell and utility text scale, without a Tailwind runtime. */
+.text-xs{font-size:clamp(.68rem,1.7vw,.75rem);line-height:1rem}.text-sm{font-size:clamp(.78rem,2vw,.875rem);line-height:1.25rem}.text-base{font-size:clamp(.92rem,2.4vw,1rem);line-height:1.5rem}.text-\[10px\]{font-size:10px;line-height:14px}.text-\[11px\]{font-size:11px;line-height:15px}.max-w-md,.dftr-phone-shell{width:100%;max-width:30rem;margin-inline:auto}.mx-auto{margin-inline:auto}
+.dftr-bottom-nav button,.dftr-bottom-nav button i,.dftr-bottom-nav button span,.modal,.card,.panel{transition:background-color .18s ease,color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}.animate-fadeIn{animation:dftr-fade-in .2s ease-out both}.active-scale-95:active{transform:scale(.95)}.dftr-bottom-nav button:active,.primary:active,.danger-btn:active,.dftr-hero-actions button:active,.liquidity-hero-bottom button:active,.withdrawals-hero-bottom button:active,.customers-page-head button:active,.settings-save:active{transform:scale(.95)}.dftr-bottom-nav button:focus-visible,.primary:focus-visible,.soft-btn:focus-visible{outline:3px solid #5aa890;outline-offset:3px}body:has(.dftr-bottom-nav)>.overlay.show>.modal{animation:dftr-fade-in .2s ease-out both}@keyframes dftr-fade-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(min-width:801px){body{background:#ebe8df}body:has(.dftr-bottom-nav) .app.dftr-phone-shell{width:min(100%,30rem)!important;max-width:30rem!important;min-height:100dvh;padding-inline:20px!important;background:#f8f5ed;box-shadow:0 0 0 1px #ded8ca,0 18px 55px #3b35221a}body:has(.dftr-bottom-nav) .dftr-bottom-nav{display:grid!important;width:min(100%,30rem)!important;max-width:30rem!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;right:auto!important;left:50%!important;transform:translateX(-50%);padding-inline:12px!important;border-right:1px solid #e5e0d6!important;border-left:1px solid #e5e0d6!important}body:has(.dftr-bottom-nav)>.overlay.show>.modal.fullscreen-modal{width:min(100%,30rem)!important;max-width:30rem!important}body:has(.dftr-bottom-nav)>.overlay.show>.modal:not(.fullscreen-modal){width:min(calc(100% - 32px),30rem)!important}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
+/* A customer profile is a full screen in the phone app, not a narrow dialog.
+   Keep only the small phone gutter while leaving the fixed navigation outside it. */
+body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal.fullscreen-modal{
+  width:min(100%,34rem)!important;
+  max-width:34rem!important;
+  padding:12px!important;
+}
+body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal .record-scroll,
+body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal .customer-breadcrumb,
+body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal .customer-hero,
+body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal .customer-detail-actions,
+body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal .customer-detail-filters,
+body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal .customer-empty-operations{
+  width:100%!important;
+  max-width:none!important;
+}
+body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal .record-scroll{
+  align-self:stretch!important;
+  min-width:0!important;
+}
+@media(max-width:520px){
+  body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal.fullscreen-modal{padding:12px!important}
+}

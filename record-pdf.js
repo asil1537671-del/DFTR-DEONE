@@ -79,6 +79,67 @@
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
+  const localDate = value => {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime())) return '';
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+  };
+  const localTime = value => {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  // Every downloadable ledger uses the same period chooser.  It is a second
+  // overlay so the current ledger stays open after the user downloads or cancels.
+  window.openDaftariPdfPeriodChooser = ({ title = 'تنزيل السجل PDF', entries = [], getDate, getTime, onDownload }) => {
+    const today = localDate();
+    const layer = document.createElement('div');
+    const panel = document.createElement('div');
+    layer.className = 'overlay show pdf-period-overlay';
+    layer.style.zIndex = '90';
+    panel.className = 'modal pdf-period-modal';
+    panel.innerHTML = `<div class="modal-head"><div><h3>${title}</h3><p class="muted">حدد الفترة والوقت قبل إنشاء ملف PDF.</p></div><button type="button" class="x" id="closePdfPeriod">×</button></div><form id="pdfPeriodForm"><label class="settings-check"><input name="allPeriod" type="checkbox"> كامل السجل دون تصفية</label><div class="grid2"><div class="field"><label>من تاريخ</label><input name="fromDate" type="date" lang="en" dir="ltr" required value="${today}"></div><div class="field"><label>إلى تاريخ</label><input name="toDate" type="date" lang="en" dir="ltr" required value="${today}"></div><div class="field"><label>من وقت (اختياري)</label><input name="fromTime" type="time" lang="en" dir="ltr"></div><div class="field"><label>إلى وقت (اختياري)</label><input name="toTime" type="time" lang="en" dir="ltr"></div></div><div class="form-actions"><button class="primary" type="submit">حفظ وتنزيل PDF</button><button class="soft-btn" type="button" id="cancelPdfPeriod">إلغاء</button></div></form>`;
+    layer.append(panel);
+    document.body.append(layer);
+    const remove = () => layer.remove();
+    panel.querySelector('#closePdfPeriod').onclick = remove;
+    panel.querySelector('#cancelPdfPeriod').onclick = remove;
+    layer.addEventListener('click', event => { if (event.target === layer) remove(); });
+    const form = panel.querySelector('#pdfPeriodForm');
+    const allPeriodInput = form.elements.allPeriod;
+    const periodInputs = [form.elements.fromDate, form.elements.toDate, form.elements.fromTime, form.elements.toTime];
+    allPeriodInput.addEventListener('change', () => periodInputs.forEach(input => { input.disabled = allPeriodInput.checked; }));
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const values = new FormData(event.currentTarget);
+      const allPeriod = values.get('allPeriod') === 'on';
+      const fromDate = String(values.get('fromDate') || '');
+      const toDate = String(values.get('toDate') || '');
+      const fromTime = String(values.get('fromTime') || '00:00').slice(0, 5);
+      const toTime = String(values.get('toTime') || '23:59').slice(0, 5);
+      const start = `${fromDate}T${fromTime}`;
+      const end = `${toDate}T${toTime}`;
+      if (!allPeriod && (!fromDate || !toDate || start > end)) {
+        toast('تحقق من التاريخ والوقت المحددين');
+        return;
+      }
+      const selected = allPeriod ? [...entries] : entries.filter(entry => {
+        const date = String(getDate?.(entry) || entry?.date || localDate(entry?.createdAt) || '');
+        const time = String(getTime?.(entry) || entry?.time || localTime(entry?.createdAt) || '00:00').slice(0, 5);
+        if (!date) return false;
+        const stamp = `${date}T${time || '00:00'}`;
+        return stamp >= start && stamp <= end;
+      });
+      const period = allPeriod
+        ? { label: 'كامل السجل', fileSuffix: 'كامل-السجل' }
+        : { label: `${fromDate}${values.get('fromTime') ? ` ${fromTime}` : ''} — ${toDate}${values.get('toTime') ? ` ${toTime}` : ''}`, fileSuffix: `${fromDate}-إلى-${toDate}` };
+      remove();
+      onDownload?.(selected, period);
+    });
+  };
+
   const openClientBase = openClient;
   openClient = clientId => {
     openClientBase(clientId);
@@ -89,8 +150,13 @@
     button.type = 'button'; button.className = 'soft-btn'; button.dataset.clientPdf = 'true'; button.textContent = '↓ تنزيل سجل العميل PDF';
     button.onclick = () => {
       const rows = [...(client.records || [])].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
-      window.downloadDaftariRecordPdf({ title: 'سجل عمليات العميل', subtitle: `${client.name}${client.phone ? ` · ${client.phone}` : ''}`, fileName: `سجل-${client.name}`, sections: [{ title: 'العمليات', rows: rows.length ? rows.map(record => ({ label: `${record.type === 'payment' ? 'تسديد' : 'إضافة دين'} · ${niceDate(record.date) || '—'}${record.note ? ` · ${record.note}` : ''}`, value: `${record.type === 'payment' ? '−' : '+'} ${fmt(record.amount)} ${record.currency || ''}` })) : [{ label: 'العمليات', value: 'لا توجد عمليات مسجلة' }] }] });
-      toast('تم تنزيل سجل العميل بصيغة PDF');
+      window.openDaftariPdfPeriodChooser({
+        title: 'تنزيل سجل العميل PDF', entries: rows, getDate: record => record.date,
+        onDownload: (selected, period) => {
+          window.downloadDaftariRecordPdf({ title: 'سجل عمليات العميل', subtitle: `${client.name}${client.phone ? ` · ${client.phone}` : ''} · ${period.label}`, fileName: `سجل-${client.name}-${period.fileSuffix}`, sections: [{ title: 'العمليات', rows: selected.length ? selected.map(record => ({ label: `${record.type === 'payment' ? 'تسديد' : 'إضافة دين'} · ${niceDate(record.date) || '—'}${record.note ? ` · ${record.note}` : ''}`, value: `${record.type === 'payment' ? '−' : '+'} ${fmt(record.amount)} ${record.currency || ''}` })) : [{ label: 'العمليات', value: 'لا توجد عمليات في الفترة المحددة' }] }] });
+          toast('تم تنزيل سجل العميل بصيغة PDF');
+        }
+      });
     };
     actions.append(button);
   };

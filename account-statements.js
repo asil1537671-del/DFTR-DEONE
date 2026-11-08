@@ -17,6 +17,23 @@
   const formatAmount = value => new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(value) || 0);
   const formatBalance = (value, currency = 'USD') => `${Number(value) < -0.005 ? '−' : ''}${currency} ${formatAmount(Math.abs(Number(value) || 0))}`;
   const balanceLabel = value => value > 0.005 ? 'رصيد مستحق على العميل' : value < -0.005 ? 'رصيد للعميل' : 'الحساب متوازن';
+  const recordTime = record => {
+    if (!record?.createdAt) return '00:00';
+    const date = new Date(record.createdAt);
+    return Number.isNaN(date.getTime()) ? '00:00' : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+  const recordMoment = record => `${String(record?.date || '').slice(0, 10)}T${recordTime(record)}`;
+  const matchesPeriod = (record, from, to, fromTime = '', toTime = '') => {
+    const date = String(record?.date || '').slice(0, 10);
+    const moment = recordMoment(record);
+    if (!date) return false;
+    if (from && moment < `${from}T${fromTime || '00:00'}`) return false;
+    if (to && moment > `${to}T${toTime || '23:59'}`) return false;
+    return true;
+  };
+  const periodText = (from, to, fromTime = '', toTime = '') => from || to
+    ? `${from ? niceDate(from) : 'البداية'}${fromTime ? ` ${fromTime}` : ''} — ${to ? niceDate(to) : 'اليوم'}${toTime ? ` ${toTime}` : ''}`
+    : 'كامل الفترة';
 
   function statementValue(client, record, currency) {
     const value = currency === 'all'
@@ -25,7 +42,7 @@
     return record.type === 'payment' ? -value : value;
   }
 
-  function openStatementService() {
+  function openStatementService(initialClientId = null) {
     const clients = [...db.clients].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     const currencyOptions = [
       ['all', 'جميع العملات'],
@@ -39,7 +56,7 @@
       <form id="accountStatementForm" class="account-statement-controls">
         <div class="field account-statement-client-field"><label for="statementClientTrigger">اختر العميل</label><input id="statementClient" name="clientId" type="hidden" value=""><button id="statementClientTrigger" class="account-statement-client-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="statementClientPicker" ${clients.length ? '' : 'disabled'}><span id="statementClientLabel">${clients.length ? 'اختر عميلًا' : 'لا يوجد عملاء بعد'}</span><span class="account-statement-client-caret" aria-hidden="true">⌕</span></button></div>
         <div class="field"><label for="statementCurrency">العملة</label><select id="statementCurrency" name="currency">${currencyOptions}</select></div>
-        <div class="account-statement-dates"><div class="field"><label for="statementFrom">من تاريخ</label><input id="statementFrom" name="from" type="date" lang="en" dir="ltr"></div><div class="field"><label for="statementTo">إلى تاريخ</label><input id="statementTo" name="to" type="date" lang="en" dir="ltr"></div></div>
+        <div class="account-statement-dates"><div class="field"><label for="statementFrom">من تاريخ</label><input id="statementFrom" name="from" type="date" lang="en" dir="ltr"></div><div class="field"><label for="statementTo">إلى تاريخ</label><input id="statementTo" name="to" type="date" lang="en" dir="ltr"></div><div class="field"><label for="statementFromTime">من وقت (اختياري)</label><input id="statementFromTime" name="fromTime" type="time" lang="en" dir="ltr"></div><div class="field"><label for="statementToTime">إلى وقت (اختياري)</label><input id="statementToTime" name="toTime" type="time" lang="en" dir="ltr"></div></div>
         <div class="account-statement-actions"><button class="primary" type="submit" ${clients.length ? '' : 'disabled'}>عرض الكشف</button><button class="soft-btn account-statement-print" type="button" id="printAccountStatement" hidden>تنزيل PDF</button></div>
       </form>
       <dialog id="statementClientPicker" class="account-statement-client-dialog" aria-labelledby="statementClientPickerTitle"><div class="account-statement-client-dialog-inner"><header class="account-statement-client-dialog-head"><h4 id="statementClientPickerTitle">اختر العميل</h4><button id="closeStatementClientPicker" class="x" type="button" aria-label="إغلاق قائمة العملاء">×</button></header><label for="statementClientSearch">ابحث باسم العميل أو رقم الهاتف</label><input id="statementClientSearch" type="search" autocomplete="off" placeholder="اكتب اسم العميل أو رقم الهاتف"><div id="statementClientResults" class="account-statement-client-results" role="listbox" aria-label="نتائج العملاء"></div><p id="statementClientEmpty" class="account-statement-client-empty" hidden>لا توجد نتائج مطابقة.</p></div></dialog>
@@ -67,16 +84,18 @@
       }
       const from = String(values.get('from') || '');
       const to = String(values.get('to') || '');
+      const fromTime = String(values.get('fromTime') || '');
+      const toTime = String(values.get('toTime') || '');
       const currency = String(values.get('currency') || 'all');
-      if (from && to && from > to) {
-        toast('تاريخ البداية يجب أن يسبق تاريخ النهاية');
+      if ((from && to && from > to) || (from === to && fromTime && toTime && fromTime > toTime)) {
+        toast('تحقق من التاريخ والوقت المحددين');
         return;
       }
       const originalLabel = printButton.textContent;
       printButton.disabled = true;
       printButton.textContent = 'جارٍ تجهيز PDF…';
       try {
-        const pdf = buildStatementPdf(client, from, to, currency);
+        const pdf = buildStatementPdf(client, from, to, currency, fromTime, toTime);
         downloadStatementPdf(pdf, client.name);
         toast('تم تنزيل كشف الحساب بصيغة PDF');
       } catch (error) {
@@ -136,12 +155,14 @@
       if (!client) return;
       const from = String(values.get('from') || '');
       const to = String(values.get('to') || '');
+      const fromTime = String(values.get('fromTime') || '');
+      const toTime = String(values.get('toTime') || '');
       const currency = String(values.get('currency') || 'all');
-      if (from && to && from > to) {
-        toast('تاريخ البداية يجب أن يسبق تاريخ النهاية');
+      if ((from && to && from > to) || (from === to && fromTime && toTime && fromTime > toTime)) {
+        toast('تحقق من التاريخ والوقت المحددين');
         return;
       }
-      renderStatement(client, from, to, currency, report);
+      renderStatement(client, from, to, currency, report, fromTime, toTime);
       printButton.hidden = false;
     }
 
@@ -157,15 +178,24 @@
       }
       renderFromForm();
     });
+
+    const initialClient = clients.find(client => String(client.id) === String(initialClientId));
+    if (initialClient) {
+      clientIdInput.value = String(initialClient.id);
+      clientLabel.textContent = `${initialClient.name}${initialClient.phone ? ` · ${initialClient.phone}` : ''}`;
+      clientTrigger.setAttribute('aria-label', `العميل المختار: ${initialClient.name}${initialClient.phone ? `، ${initialClient.phone}` : ''}. اضغط لتغيير العميل`);
+      renderClientOptions();
+      renderFromForm();
+    }
   }
 
-  function renderStatement(client, from, to, currency, report) {
+  function renderStatement(client, from, to, currency, report, fromTime = '', toTime = '') {
     const records = Array.isArray(client.records) ? [...client.records] : [];
     const chronological = records.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
     const matchesCurrency = record => currency === 'all' || record.currency === currency;
-    const openingRecords = from ? chronological.filter(record => matchesCurrency(record) && record.date && record.date < from) : [];
+    const openingRecords = from ? chronological.filter(record => matchesCurrency(record) && record.date && recordMoment(record) < `${from}T${fromTime || '00:00'}`) : [];
     const opening = openingRecords.reduce((sum, record) => sum + statementValue(client, record, currency), 0);
-    const period = chronological.filter(record => matchesCurrency(record) && (!from || String(record.date || '') >= from) && (!to || String(record.date || '') <= to));
+    const period = chronological.filter(record => matchesCurrency(record) && matchesPeriod(record, from, to, fromTime, toTime));
     const periodAmount = record => currency === 'all'
       ? Math.abs(Number(recordUsd(client, record)) || 0)
       : Math.abs(Number(record.amount) || 0);
@@ -183,11 +213,11 @@
       return `<tr><td>${escapeHtml(niceDate(record.date) || '—')}</td><td>${transaction}</td><td class="amount ${amountClass}">${sign} ${formatAmount(record.amount)} ${escapeHtml(originalCurrency)}</td><td>${formatBalance(usdEquivalent, 'USD')}</td><td>${formatBalance(running, statementCurrency)}</td><td>${escapeHtml(record.note || '—')}</td></tr>`;
     }).join('');
     const closing = opening + debts - payments;
-    const periodText = from || to ? `${from ? niceDate(from) : 'البداية'} — ${to ? niceDate(to) : 'اليوم'}` : 'كامل الفترة';
+    const selectedPeriod = periodText(from, to, fromTime, toTime);
     const contact = client.phone ? `رقم الهاتف: ${escapeHtml(client.phone)}` : 'لا يوجد رقم هاتف';
     const currencyLabel = currencyNames[currency] || currency;
     report.innerHTML = `<section class="account-statement-sheet">
-      <header class="account-statement-heading"><div><h4>كشف حساب العميل: ${escapeHtml(client.name)}</h4><p>${contact} · ${escapeHtml(periodText)} · العملة: ${escapeHtml(currencyLabel)}</p></div><div class="account-statement-closing"><strong>${formatBalance(closing, statementCurrency)}</strong><small>${balanceLabel(closing)}</small></div></header>
+      <header class="account-statement-heading"><div><h4>كشف حساب العميل: ${escapeHtml(client.name)}</h4><p>${contact} · ${escapeHtml(selectedPeriod)} · العملة: ${escapeHtml(currencyLabel)}</p></div><div class="account-statement-closing"><strong>${formatBalance(closing, statementCurrency)}</strong><small>${balanceLabel(closing)}</small></div></header>
       <div class="account-statement-summary"><div><small>الرصيد السابق</small><strong>${formatBalance(opening, statementCurrency)}</strong></div><div><small>إجمالي الديون</small><strong>${formatBalance(debts, statementCurrency)}</strong></div><div><small>إجمالي التسديدات</small><strong>${formatBalance(payments, statementCurrency)}</strong></div><div><small>الرصيد النهائي</small><strong>${formatBalance(closing, statementCurrency)}</strong></div></div>
       <div class="account-statement-table-wrap"><table class="account-statement-table"><thead><tr><th>التاريخ</th><th>الحركة</th><th>المبلغ المدخل</th><th>المكافئ USD</th><th>الرصيد ${escapeHtml(statementCurrency)}</th><th>الملاحظة</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="account-statement-empty">لا توجد عمليات بهذه العملة في هذه الفترة.</td></tr>'}</tbody></table></div>
     </section>`;
@@ -258,7 +288,7 @@
     context.strokeRect(x + .5, y + .5, width - 1, height - 1);
   }
 
-  function buildStatementPdf(client, from, to, currency) {
+  function buildStatementPdf(client, from, to, currency, fromTime = '', toTime = '') {
     const pageWidth = 794;
     const pageHeight = 1123;
     const margin = 38;
@@ -268,12 +298,10 @@
     const chronological = records.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
     const matchesCurrency = record => currency === 'all' || record.currency === currency;
     const opening = from
-      ? chronological.filter(record => matchesCurrency(record) && record.date && record.date < from)
+      ? chronological.filter(record => matchesCurrency(record) && record.date && recordMoment(record) < `${from}T${fromTime || '00:00'}`)
         .reduce((sum, record) => sum + statementValue(client, record, currency), 0)
       : 0;
-    const period = chronological.filter(record => matchesCurrency(record)
-      && (!from || String(record.date || '') >= from)
-      && (!to || String(record.date || '') <= to));
+    const period = chronological.filter(record => matchesCurrency(record) && matchesPeriod(record, from, to, fromTime, toTime));
     const periodAmount = record => currency === 'all'
       ? Math.abs(Number(recordUsd(client, record)) || 0)
       : Math.abs(Number(record.amount) || 0);
@@ -281,7 +309,7 @@
     const payments = period.filter(record => record.type === 'payment').reduce((sum, record) => sum + periodAmount(record), 0);
     const statementCurrency = currency === 'all' ? 'USD' : currency;
     const closing = opening + debts - payments;
-    const periodText = from || to ? `${from ? niceDate(from) : 'البداية'} — ${to ? niceDate(to) : 'اليوم'}` : 'كامل الفترة';
+    const selectedPeriod = periodText(from, to, fromTime, toTime);
     const currencyLabel = currencyNames[currency] || currency;
     let running = opening;
     const rows = period.map(record => {
@@ -365,7 +393,7 @@
         drawPdfText(context, `العميل: ${client.name || ''}`, pageWidth - margin, 82, contentWidth, {
           font: 'bold 16px Arial, Tahoma, sans-serif', color: colors.ink, maxLines: 1
         });
-        drawPdfText(context, `رقم الهاتف: ${client.phone || 'لا يوجد'} · الفترة: ${periodText} · العملة: ${currencyLabel}`, pageWidth - margin, 110, contentWidth, {
+        drawPdfText(context, `رقم الهاتف: ${client.phone || 'لا يوجد'} · الفترة: ${selectedPeriod} · العملة: ${currencyLabel}`, pageWidth - margin, 110, contentWidth, {
           font: '13px Arial, Tahoma, sans-serif', color: colors.muted, maxLines: 2, lineHeight: 18
         });
         roundedPdfBox(context, margin, 154, contentWidth, 78, colors.soft);
@@ -396,7 +424,7 @@
         drawPdfText(context, 'كشف حساب العميل · متابعة', pageWidth - margin, 42, contentWidth, {
           font: 'bold 19px Arial, Tahoma, sans-serif', color: colors.green, maxLines: 1
         });
-        drawPdfText(context, `${client.name || ''} · ${periodText} · ${currencyLabel}`, pageWidth - margin, 76, contentWidth, {
+        drawPdfText(context, `${client.name || ''} · ${selectedPeriod} · ${currencyLabel}`, pageWidth - margin, 76, contentWidth, {
           font: '12px Arial, Tahoma, sans-serif', color: colors.muted, maxLines: 1
         });
         tableY = 112;

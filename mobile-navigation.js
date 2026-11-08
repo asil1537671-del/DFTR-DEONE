@@ -248,7 +248,10 @@
         if (parentSnapshotOverride === savedParent) parentSnapshotOverride = null;
       });
     }
-    if (!restoring && !openingRoute && !isRestoredClient) {
+    // Bottom tabs own their page transition.  They replace the visible root
+    // screen directly, so adding a browser-history entry here can make a
+    // repeated tap restore the home screen.
+    if (!restoring && !openingRoute && !isRestoredClient && !window.__dftrTabNavigation) {
       const parent = snapshotCurrentState() || homeState();
       const next = { [KEY]: 'screen', screen: pendingScreen, parent };
       const current = normalizeState(history.state);
