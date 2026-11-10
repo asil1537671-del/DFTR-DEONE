@@ -1,5 +1,7 @@
 .daftari-auth-layer{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,#edf7f1ef,#d7eee5ef);backdrop-filter:blur(8px)}
 .daftari-auth-layer[hidden]{display:none!important}
+.daftari-auth-layer [hidden]{display:none!important}
+body.daftari-auth-pending>:not(#daftariAuthLayer){visibility:hidden!important}
 .daftari-auth-card{width:min(430px,100%);padding:30px 25px;border:1px solid #d5e8dd;border-radius:26px;background:#fff;box-shadow:0 24px 70px #154b3429;text-align:center}
 .daftari-auth-mark{width:65px;height:65px;display:grid;place-items:center;margin:0 auto 15px;border-radius:21px;background:#197d5d;color:#fff;font-size:31px;font-weight:800;box-shadow:0 10px 24px #0d6b4e36}
 .daftari-auth-card h2{margin:0;color:#183b2e;font-size:25px}.daftari-auth-card p{margin:10px 0 21px;color:#687b73;font-size:14px;line-height:1.8}

@@ -666,4 +666,3 @@
   document.addEventListener('pointerup', finishDrag);
   document.addEventListener('pointercancel', finishDrag);
 })();
-

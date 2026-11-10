@@ -55,7 +55,9 @@
     clients: Array.isArray(value?.clients) ? value.clients : [],
     profits: Array.isArray(value?.profits) ? value.profits : [],
     personalWithdrawals: Array.isArray(value?.personalWithdrawals) ? value.personalWithdrawals : [],
-    settings: value?.settings && typeof value.settings === 'object' ? value.settings : {}
+    settings: value?.settings && typeof value.settings === 'object'
+      ? Object.fromEntries(Object.entries(value.settings).filter(([key]) => key !== 'userProfile'))
+      : {}
   });
   const isNewer = (next, current) => String(next?.updatedAt || next?.createdAt || '').localeCompare(String(current?.updatedAt || current?.createdAt || '')) >= 0;
   const mergeItems = (remote = [], local = []) => {
@@ -109,8 +111,61 @@
     authStatus.textContent = message;
     authStatus.classList.toggle('error', error);
   };
-  const showGate = () => { layer.hidden = false; document.body.classList.add('daftari-auth-pending'); };
-  const hideGate = () => { layer.hidden = true; document.body.classList.remove('daftari-auth-pending'); };
+  const lockedBackground = new Map();
+  const lockBackground = () => {
+    [...document.body.children].filter(element => element !== layer).forEach(element => {
+      if (!lockedBackground.has(element)) {
+        lockedBackground.set(element, {
+          inert: element.hasAttribute('inert'),
+          ariaHidden: element.getAttribute('aria-hidden')
+        });
+      }
+      element.setAttribute('inert', '');
+      element.setAttribute('aria-hidden', 'true');
+    });
+  };
+  const unlockBackground = () => {
+    lockedBackground.forEach((original, element) => {
+      if (original.inert) element.setAttribute('inert', '');
+      else element.removeAttribute('inert');
+      if (original.ariaHidden === null) element.removeAttribute('aria-hidden');
+      else element.setAttribute('aria-hidden', original.ariaHidden);
+    });
+    lockedBackground.clear();
+  };
+  const showGate = () => {
+    layer.hidden = false;
+    lockBackground();
+    document.body.classList.add('daftari-auth-pending');
+  };
+  const hideGate = () => {
+    layer.hidden = true;
+    unlockBackground();
+    document.body.classList.remove('daftari-auth-pending');
+  };
+
+  async function refreshGoogleAvailability() {
+    googleLogin.hidden = true;
+    layer.querySelector('.daftari-auth-divider').hidden = true;
+    try {
+      const response = await fetch(`${config.url}/auth/v1/settings`, {
+        headers: { apikey: config.publishableKey },
+        cache: 'no-store'
+      });
+      if (!response.ok) throw new Error('auth-settings-unavailable');
+      const settings = await response.json();
+      const enabled = settings?.external?.google === true;
+      googleLogin.hidden = !enabled;
+      layer.querySelector('.daftari-auth-divider').hidden = !enabled;
+      layer.querySelector('.daftari-auth-card > p').textContent = enabled
+        ? 'تابع بحساب Google أو أدخل بريدك الإلكتروني وسنرسل لك رابطًا آمنًا للدخول دون كلمة مرور.'
+        : 'أدخل بريدك الإلكتروني وسنرسل لك رابطًا آمنًا للدخول دون كلمة مرور.';
+      if (!enabled) setStatus('تسجيل Google غير مفعّل حاليًا؛ استخدم البريد الإلكتروني.', false);
+    } catch {
+      layer.querySelector('.daftari-auth-card > p').textContent = 'أدخل بريدك الإلكتروني وسنرسل لك رابطًا آمنًا للدخول دون كلمة مرور.';
+      setStatus('تعذر التحقق من مزوّد Google. يمكنك تسجيل الدخول بالبريد الإلكتروني.', false);
+    }
+  }
 
   function snapshotLegacyLedger() {
     if (localStorage.getItem(MIGRATION_KEY) || localStorage.getItem(LEGACY_KEY)) return;
@@ -139,6 +194,12 @@
     } catch {
       return emptyLedger();
     }
+  }
+
+  async function clearFileInstallationBackup() {
+    try {
+      await fetch('/api/legacy-ledger', { method: 'DELETE', cache: 'no-store' });
+    } catch {}
   }
 
   function applyLedger(value, userId) {
@@ -172,6 +233,7 @@
     if (!user || syncStartedFor === user.id) return;
     syncStartedFor = user.id;
     activeUser = user;
+    window.DaftariCurrentUser = user;
     showGate();
     setStatus('جارٍ تأمين حسابك واستعادة بيانات الدفتر…');
     authSubmit.disabled = true;
@@ -186,6 +248,7 @@
       if (changed) await writeRemoteLedger(user.id, combined);
       lastRemoteStamp = remote?.updated_at || lastRemoteStamp;
       applyLedger(combined, user.id);
+      if (hasData(transferred)) await clearFileInstallationBackup();
       localStorage.setItem(MIGRATION_KEY, user.id);
       if (hasData(legacy)) localStorage.removeItem(LEGACY_KEY);
       addAccountButton(user.email || 'الحساب مرتبط');
@@ -255,6 +318,8 @@
     return;
   }
 
+  refreshGoogleAvailability();
+
   authForm.addEventListener('submit', async event => {
     event.preventDefault();
     const email = String(new FormData(authForm).get('email') || '').trim().toLowerCase();
@@ -285,6 +350,7 @@
   client.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || !session) {
       activeUser = null;
+      window.DaftariCurrentUser = null;
       syncStartedFor = '';
       document.querySelector('#daftariAccountButton')?.remove();
       showGate();

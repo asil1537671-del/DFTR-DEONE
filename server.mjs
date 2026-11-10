@@ -19,6 +19,8 @@ const MIME_TYPES = {
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.webmanifest': 'application/manifest+json'
@@ -246,7 +248,7 @@ async function handleApi(req, res, url) {
 
 function legacyCors(res) {
   res.setHeader('Access-Control-Allow-Origin', 'null');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Vary', 'Origin');
 }
@@ -257,6 +259,17 @@ async function handleLegacyLedger(req, res) {
     res.writeHead(204);
     res.end();
     return;
+  }
+
+  if (req.method === 'DELETE') {
+    if (!allowedOrigins.has(req.headers.origin)) return fail(res, 403, 'مصدر الطلب غير مسموح.');
+    try {
+      await rm(LEGACY_LEDGER_FILE, { force: true });
+      return json(res, 200, { cleared: true });
+    } catch (error) {
+      console.error('تعذر مسح نسخة البيانات القديمة بعد المزامنة:', error);
+      return fail(res, 500, 'تعذر مسح نسخة البيانات القديمة.');
+    }
   }
 
   if (req.method === 'POST') {

@@ -368,17 +368,6 @@
     home.querySelector('[data-home-client-button-count]').textContent = number(clients.length);
     home.querySelector('[data-home-records]').textContent = number(records.length);
     home.querySelector('[data-home-fees]').textContent = `$ ${number(commissionUsd)}`;
-    const liquidity = (data().liquidityEntries || []).reduce((all, entry) => {
-      const currency = entry.currency || 'USD';
-      all[currency] = (all[currency] || 0) + (Number(entry.amount) || 0);
-      return all;
-    }, {});
-    const displayCurrency = data().settings?.liquidityDisplayCurrency || 'USD';
-    const rates = data().settings?.exchangeRatesByType?.debt || data().settings?.exchangeRates || {};
-    const rate = currency => Number(rates[currency]) || (currency === 'SAR' ? 3.8 : currency === 'YER' ? 535 : 1);
-    const liquidityUsd = Object.entries(liquidity).reduce((sum, [currency, amount]) => sum + amount / rate(currency), 0);
-    const liquiditySymbol = { USD: '$', SAR: 'ر.س', YER: 'ر.ي', USDT: '₮' }[displayCurrency] || displayCurrency;
-    home.querySelector('[data-home-liquidity-total]').textContent = `${liquiditySymbol} ${number(liquidityUsd * rate(displayCurrency))}`;
     const currencyBox = home.querySelector('[data-home-currencies]');
     const currencyRows = Object.entries(balances).filter(([, value]) => Math.abs(value) > 0.00001);
     currencyBox.innerHTML = currencyRows.length ? currencyRows.map(([currency, value]) => `<div class="dftr-currency-row"><span>${escapeHtml((currencies?.[currency] || currency).replace(/^.*? /, ''))}</span><strong>${value < 0 ? '−' : ''}${number(Math.abs(value))} ${escapeHtml(currency)}</strong></div>`).join('') : '<div class="dftr-home-empty">لا توجد أرصدة بعد — سجّل أول عملية لعمل.</div>';
