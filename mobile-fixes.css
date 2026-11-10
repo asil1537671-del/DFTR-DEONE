@@ -259,3 +259,16 @@ body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal .record-scroll{
 @media(max-width:520px){
   body:has(.dftr-bottom-nav)>.overlay.show>.customer-detail-modal.fullscreen-modal{padding:12px!important}
 }
+
+/* Match the reference icon style and keep the restored liquidity shortcut visible. */
+
+.dftr-hero-actions button{display:flex;align-items:center;justify-content:center;gap:8px}
+.dftr-hero-actions .dftr-action-icon{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.dftr-hero-actions .home-client-count{min-width:24px;height:24px;padding:0 5px;display:inline-grid;place-items:center;border-radius:9px;background:#ffffff42;color:inherit;font-size:14px;line-height:1;direction:ltr}
+.home-top .user-session-action:before{content:"";display:block;width:28px;height:28px;font-size:0!important;line-height:0;background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%2352645b'%20stroke-width='1.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Ccircle%20cx='12'%20cy='8'%20r='4'/%3E%3Cpath%20d='M5%2021v-2a7%207%200%200%201%2014%200v2'/%3E%3C/svg%3E") center/contain no-repeat}
+@media(max-width:420px){.dftr-hero-actions button{gap:6px}.dftr-hero-actions .dftr-action-icon{width:19px;height:19px}.dftr-hero-actions .home-client-count{min-width:20px;height:20px;padding:0 4px;font-size:12px}}.home-top #daftariLogout:before{content:"";display:block;width:28px;height:28px;font-size:0!important;line-height:0;background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%2352645b'%20stroke-width='1.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Ccircle%20cx='12'%20cy='8'%20r='4'/%3E%3Cpath%20d='M5%2021v-2a7%207%200%200%201%2014%200v2'/%3E%3C/svg%3E") center/contain no-repeat}@media(max-width:420px){
+ .dftr-hero-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .dftr-hero-actions button{min-width:0;min-height:54px!important;padding-inline:3px!important;gap:4px;white-space:normal;font-size:clamp(10px,3.6vw,14px)!important}
+ .dftr-hero-actions .dftr-action-icon{width:clamp(14px,4.5vw,19px);height:clamp(14px,4.5vw,19px)}
+}
+@media(max-width:320px){.dftr-hero-actions .home-client-list{position:relative}.dftr-hero-actions .home-client-count{position:absolute;top:3px;left:3px;min-width:15px;height:15px;padding:0 3px;font-size:9px}}

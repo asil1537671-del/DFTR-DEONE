@@ -19,22 +19,23 @@
     if (!client || !modal || !overlay || modal.querySelector('.customer-hero')) return;
     modal.classList.add('fullscreen-modal', 'customer-detail-modal');
     overlay.classList.add('fullscreen');
-    const preferred = client.displayCurrency || client.preferredCurrency || 'USD';
+    const currencyChoices = ['USD', 'SAR', 'YER', 'USDT'];
+    const requestedCurrency = client.displayCurrency || client.preferredCurrency || 'USD';
+    const preferred = currencyChoices.includes(requestedCurrency) ? requestedCurrency : 'USD';
     const rawPhone = String(client.phone || '').replace(/\D/g, '');
     const phone = rawPhone ? escapeHtml(client.phone) : 'لا يوجد رقم هاتف';
     const rateForDisplay = currency => {
       const rates = db.settings?.exchangeRatesByType?.debt || db.settings?.exchangeRates || {};
       const configured = Number(rates[currency]);
       if (Number.isFinite(configured) && configured > 0) return configured;
-      return currency === 'SAR' ? 3.8 : currency === 'YER' ? 535 : currency === 'EUR' ? 0.92 : 1;
+      return currency === 'SAR' ? 3.8 : currency === 'YER' ? 535 : 1;
     };
     const balance = usdBalance(client) * rateForDisplay(preferred);
-    const currencyChoices = ['USD', 'SAR', 'YER', 'USDT', 'EUR'];
     const chips = currencyChoices.map(currency => `<button type="button" class="customer-currency-chip ${currency === preferred ? 'active' : ''}" data-display-currency="${currency}">${escapeHtml(currency)}</button>`).join('');
     const contactButtons = rawPhone ? `<a href="tel:${rawPhone}">اتصال</a><a href="https://wa.me/${rawPhone}" target="_blank" rel="noopener">واتساب</a>` : '';
     const hero = document.createElement('section');
     hero.className = 'customer-hero';
-    hero.innerHTML = `<div class="customer-hero-actions" aria-label="خيارات العميل"><button type="button" class="customer-quick-edit" title="تعديل">✎</button><button type="button" class="customer-quick-statement" title="كشف حساب">▣</button><button type="button" class="customer-quick-archive" title="أرشفة العميل">⌑</button></div><div class="customer-hero-head"><div><h2>${escapeHtml(client.name)}</h2><p class="customer-phone">${phone}</p><div class="customer-contact-actions">${contactButtons}</div></div></div><div class="customer-hero-balance"><span>${Math.abs(balance) < 0.0001 ? `لا يوجد رصيد بعملة ${escapeHtml(preferred)}` : `عليه بعملة ${escapeHtml(preferred)}`}</span><strong>${fmtAmount(Math.abs(balance))} ${escapeHtml(preferred)}</strong><small>≈ $ ${fmtAmount(Math.abs(usdBalance(client)))}</small></div><div class="customer-display-label">عرض الإجمالي بـ:</div><div class="customer-currency-chips">${chips}</div>`;
+    hero.innerHTML = `<div class="customer-hero-actions" aria-label="خيارات العميل"><button type="button" class="customer-quick-delete" title="حذف العميل" aria-label="حذف العميل"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 10v6M14 10v6"/></svg></button></div><div class="customer-hero-head"><div><h2>${escapeHtml(client.name)}</h2><p class="customer-phone">${phone}</p><div class="customer-contact-actions">${contactButtons}</div></div></div><div class="customer-hero-balance"><span>${Math.abs(balance) < 0.0001 ? `لا يوجد رصيد بعملة ${escapeHtml(preferred)}` : `عليه بعملة ${escapeHtml(preferred)}`}</span><strong>${fmtAmount(Math.abs(balance))} ${escapeHtml(preferred)}</strong><small>≈ $ ${fmtAmount(Math.abs(usdBalance(client)))}</small></div><div class="customer-display-label">عرض الإجمالي بـ:</div><div class="customer-currency-chips">${chips}</div>`;
     hero.querySelector('.customer-hero-balance span').textContent = Math.abs(balance) < 0.0001
       ? `لا يوجد رصيد بعملة ${preferred}`
       : `${balance > 0 ? 'عليه' : 'له'} بعملة ${preferred}`;
@@ -52,6 +53,20 @@
     breadcrumb.innerHTML = `العملاء <span>‹</span> ${escapeHtml(client.name)}`;
     if (header) header.after(breadcrumb, hero, actions, filters);
     else container.prepend(filters, actions, hero);
+    const fitClientName = () => {
+      const title = hero.querySelector('h2');
+      if (!title) return;
+      title.style.setProperty('white-space', 'nowrap', 'important');
+      let fontSize = Number.parseFloat(getComputedStyle(title).fontSize) || 31;
+      const minimum = 17;
+      title.style.setProperty('font-size', `${fontSize}px`, 'important');
+      while (title.scrollWidth > title.clientWidth && fontSize > minimum) {
+        fontSize -= 1;
+        title.style.setProperty('font-size', `${fontSize}px`, 'important');
+      }
+      if (title.scrollWidth > title.clientWidth) title.style.setProperty('white-space', 'normal', 'important');
+    };
+    requestAnimationFrame(() => requestAnimationFrame(fitClientName));
     // Always show the breadcrumb and complete hero first, even when the
     // previous page had been scrolled.
     const resetProfileScroll = () => {
@@ -65,12 +80,7 @@
     actions.querySelector('.customer-payment').onclick = () => document.getElementById('payment')?.click();
     actions.querySelector('.customer-edit').onclick = () => typeof editClient === 'function' && editClient(id);
     actions.querySelector('.customer-statement').onclick = () => window.openAccountStatements?.(id);
-    hero.querySelector('.customer-quick-edit').onclick = () => typeof editClient === 'function' && editClient(id);
-    hero.querySelector('.customer-quick-statement').onclick = () => window.openAccountStatements?.(id);
-    hero.querySelector('.customer-quick-archive').onclick = () => {
-      if (typeof moveToTrash !== 'function' || !confirm(`أرشفة العميل ${client.name}؟`)) return;
-      moveToTrash(id);
-    };
+    hero.querySelector('.customer-quick-delete').onclick = () => typeof moveToTrash === 'function' && moveToTrash(id);
     breadcrumb.onclick = () => typeof customerDirectory === 'function' && customerDirectory();
     hero.querySelectorAll('[data-display-currency]').forEach(button => button.addEventListener('click', () => {
       client.displayCurrency = button.dataset.displayCurrency;

@@ -1,0 +1,46 @@
+/* Shared typography and vector icon rules for every screen. */
+:root {
+  --dftr-font-ui: 'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif;
+  --dftr-chevron-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23778178' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 15 6-6 6 6'/%3E%3C/svg%3E");
+  --dftr-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23778178' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --dftr-icon-settings: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352645b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.1 2.1-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.04 1.56v.1h-3v-.1a1.7 1.7 0 0 0-1.04-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-2.1-2.1.06-.06A1.7 1.7 0 0 0 7.04 15 1.7 1.7 0 0 0 5.48 14H5.4v-3h.08a1.7 1.7 0 0 0 1.56-1.04 1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.1-2.1.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.04-1.56v-.08h3v.08a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.1 2.1-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.52 11h.08v3h-.08A1.7 1.7 0 0 0 19.4 15Z'/%3E%3C/svg%3E");
+  --dftr-icon-user: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352645b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M5 21v-2a7 7 0 0 1 14 0v2'/%3E%3C/svg%3E");
+}
+html, body {
+  font-family: var(--dftr-font-ui);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+body { line-height: 1.65; }
+button, input, select, textarea, table { font-family: inherit; }
+button, input, select, textarea { font-size: inherit; }
+button { line-height: inherit; }
+.dftr-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  overflow: visible;
+  vertical-align: -0.16em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dftr-currency-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  min-width: 1em;
+  flex: 0 0 auto;
+  vertical-align: -0.16em;
+}
+.currency-display { display: inline-flex; align-items: center; gap: .35em; direction: ltr; vertical-align: middle; white-space: nowrap; }
+.currency-selector-logo .dftr-currency-icon { width: 1.4em; height: 1.4em; }
+.settings-summary-icon .dftr-icon { width: 1.15em; height: 1.15em; }
+.x > .dftr-icon, .icon-action > .dftr-icon { width: 1.1em; height: 1.1em; }
+.calc .keys button > .dftr-icon { width: 1.2em; height: 1.2em; }
+@media (prefers-reduced-motion: no-preference) {
+  button, a { -webkit-tap-highlight-color: transparent; }
+}

@@ -46,9 +46,9 @@
     const clients = [...db.clients].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     const currencyOptions = [
       ['all', 'جميع العملات'],
-      ['YER', '🇾🇪 ريال يمني'],
-      ['SAR', '🇸🇦 ريال سعودي'],
-      ['USD', '🇺🇸 دولار أمريكي'],
+      ['YER', 'ريال يمني'],
+      ['SAR', 'ريال سعودي'],
+      ['USD', 'دولار أمريكي'],
       ['USDT', '₮ USDT']
     ].map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
 
