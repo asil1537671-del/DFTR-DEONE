@@ -4,7 +4,7 @@
   const header = app?.querySelector('.top');
   const cards = app?.querySelector('.cards');
   if (!app || !header || !cards || document.querySelector('.dftr-home')) return;
-  app.classList.add('dftr-phone-shell', 'max-w-md', 'mx-auto');
+  app.classList.add('dftr-phone-shell', 'max-w-md', 'mx-auto', 'reference-app-shell');
 
   const number = value => new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(value) || 0);
   const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
@@ -42,6 +42,16 @@
   mainNavigation.querySelector('[data-home-nav="withdrawals"]')?.before(liquidityNavigation);
   mainNavigation.classList.add('has-liquidity');
   mainNavigation.querySelectorAll('button > span').forEach(label => label.classList.add('text-xs'));
+  const sidebarBrand = document.createElement('div');
+  sidebarBrand.className = 'dftr-side-brand';
+  sidebarBrand.innerHTML = '<span class="dftr-side-mark" aria-hidden="true"><img src="icons/app-192.png" alt=""></span><span><strong>دفتري</strong><small>دفتر العملاء والأرصدة</small></span>';
+  mainNavigation.prepend(sidebarBrand);
+  const sidebarAccount = document.createElement('button');
+  sidebarAccount.type = 'button';
+  sidebarAccount.className = 'dftr-side-account';
+  sidebarAccount.setAttribute('aria-label', 'إدارة الحساب');
+  sidebarAccount.innerHTML = '<span class="dftr-side-account-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.5-3.7 3-5.6 7.5-5.6s7 1.9 7.5 5.6"/></svg></span><span class="dftr-side-account-copy"><strong data-sidebar-account>حسابك</strong><small>إدارة الحساب</small></span><svg class="dftr-side-account-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>';
+  mainNavigation.append(sidebarAccount);
   const activateNav = name => home.querySelectorAll('[data-home-nav]').forEach(button => button.classList.toggle('active', button.dataset.homeNav === name));
   const closeCurrentScreen = () => {
     document.querySelectorAll('.transaction-overlay, .profile-form-overlay, .client-menu-popover').forEach(node => node.remove());
@@ -92,6 +102,14 @@
       tools.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
+  const updateSidebarAccount = () => {
+    const user = window.DaftariCurrentUser;
+    const node = sidebarAccount.querySelector('[data-sidebar-account]');
+    if (node) node.textContent = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'حسابك';
+  };
+  sidebarAccount.addEventListener('click', openTools);
+  window.addEventListener('daftari:auth-change', updateSidebarAccount);
+  updateSidebarAccount();
   const openHome = () => {
     tools.hidden = true;
     activateNav('home');

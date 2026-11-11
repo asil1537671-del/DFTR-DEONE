@@ -1,0 +1,335 @@
+/* Desktop shell inspired by the supplied Daftari reference. Phone navigation stays unchanged. */
+:root {
+  --dftr-reference-sidebar: 258px;
+  --dftr-reference-paper: #f4f1e8;
+  --dftr-reference-card: #fffdf9;
+  --dftr-reference-green: #0d6858;
+  --dftr-reference-ink: #17251f;
+}
+
+.dftr-side-brand,
+.dftr-side-account { display: none; }
+
+@media (min-width: 900px) {
+  body:has(.reference-app-shell) {
+    min-width: 760px;
+    overflow-x: hidden;
+    background: var(--dftr-reference-paper);
+    color: var(--dftr-reference-ink);
+  }
+
+  body:has(.reference-app-shell) .reference-app-shell {
+    width: calc(100% - var(--dftr-reference-sidebar)) !important;
+    max-width: none !important;
+    min-height: 100dvh;
+    margin: 0 !important;
+    padding: 30px clamp(24px, 3vw, 44px) 48px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  body:has(.reference-app-shell) .top.home-top { display: none !important; }
+  body:has(.reference-app-shell) .dftr-home { width: 100%; min-width: 0; }
+  body:has(.reference-app-shell) .dftr-home-hero { min-height: 285px; padding: 30px; border-radius: 30px; }
+  body:has(.reference-app-shell) .dftr-hero-value { font-size: clamp(34px, 4vw, 54px); }
+  body:has(.reference-app-shell) .dftr-hero-stats { gap: 10px; }
+  body:has(.reference-app-shell) .dftr-hero-stat { min-height: 72px; border-radius: 16px; }
+  body:has(.reference-app-shell) .dftr-hero-actions { margin-top: 18px; }
+  body:has(.reference-app-shell) .dftr-home-main { display: block; }
+  body:has(.reference-app-shell) .dftr-home-section { margin-top: 24px; }
+  body:has(.reference-app-shell) .dftr-section-heading { margin-bottom: 12px; }
+  body:has(.reference-app-shell) .dftr-currency-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  body:has(.reference-app-shell) .dftr-currency-row {
+    min-height: 82px;
+    padding: 15px 17px;
+    border: 1px solid #e7e7df;
+    border-radius: 17px;
+    background: var(--dftr-reference-card);
+    box-shadow: 0 7px 20px #282d2409;
+  }
+  body:has(.reference-app-shell) .dftr-activity-panel { padding: 20px; border-radius: 23px; }
+
+  body:has(.reference-app-shell) .dftr-bottom-nav,
+  body:has(.reference-app-shell) .dftr-bottom-nav.has-liquidity {
+    position: fixed !important;
+    z-index: 90 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    width: var(--dftr-reference-sidebar) !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 20px 14px 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    overflow-y: auto;
+    border: 0 !important;
+    border-left: 1px solid #e4e0d6 !important;
+    border-radius: 0 !important;
+    background: #f7f4ec !important;
+    box-shadow: -9px 0 24px #2e35220b !important;
+    backdrop-filter: none !important;
+    isolation: isolate;
+  }
+
+  body:has(.reference-app-shell) .dftr-side-brand {
+    min-height: 58px;
+    margin: 0 2px 18px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    color: var(--dftr-reference-ink);
+  }
+  body:has(.reference-app-shell) .dftr-side-mark {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 13px;
+    background: var(--dftr-reference-green);
+    color: #fff;
+    font-size: 22px;
+    font-weight: 700;
+    box-shadow: 0 7px 16px #0d68582b;
+  }
+  body:has(.reference-app-shell) .dftr-side-mark img { width: 100%; height: 100%; display: block; object-fit: cover; border-radius: inherit; }
+  body:has(.reference-app-shell) .dftr-side-brand strong,
+  body:has(.reference-app-shell) .dftr-side-brand small { display: block; }
+  body:has(.reference-app-shell) .dftr-side-brand strong { font-size: 18px; line-height: 1.25; }
+  body:has(.reference-app-shell) .dftr-side-brand small { margin-top: 2px; color: #77837b; font-size: 10px; }
+
+  body:has(.reference-app-shell) .dftr-bottom-nav.has-liquidity button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 46px;
+    padding: 10px 12px !important;
+    display: flex !important;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 11px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #66766e;
+    font-size: 13px !important;
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+  }
+  body:has(.reference-app-shell) .dftr-bottom-nav [data-home-nav="liquidity"] { display: none !important; }
+  body:has(.reference-app-shell) .dftr-bottom-nav.has-liquidity button i {
+    width: 22px !important;
+    height: 22px !important;
+    flex: 0 0 22px;
+    display: grid;
+    place-items: center;
+    color: currentColor;
+  }
+  body:has(.reference-app-shell) .dftr-bottom-nav.has-liquidity button svg {
+    width: 21px !important;
+    height: 21px !important;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.9;
+  }
+  body:has(.reference-app-shell) .dftr-bottom-nav.has-liquidity button.active {
+    background: var(--dftr-reference-green) !important;
+    color: #fff !important;
+    box-shadow: 0 7px 16px #0d685820;
+  }
+  body:has(.reference-app-shell) .dftr-side-account {
+    width: 100%;
+    min-height: 66px;
+    margin-top: auto;
+    padding: 11px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #ebe7dd;
+    border-radius: 14px;
+    background: #eeebe3;
+    color: var(--dftr-reference-ink);
+    text-align: right;
+    cursor: pointer;
+  }
+  body:has(.reference-app-shell) .dftr-side-account-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: #fffdf8;
+    color: var(--dftr-reference-green);
+  }
+  body:has(.reference-app-shell) .dftr-side-account-icon svg,
+  body:has(.reference-app-shell) .dftr-side-account-arrow { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  body:has(.reference-app-shell) .dftr-side-account-copy { min-width: 0; flex: 1; }
+  body:has(.reference-app-shell) .dftr-side-account-copy strong,
+  body:has(.reference-app-shell) .dftr-side-account-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body:has(.reference-app-shell) .dftr-side-account-copy strong { font-size: 12px; }
+  body:has(.reference-app-shell) .dftr-side-account-copy small { margin-top: 3px; color: #68766f; font-size: 10px; }
+  body:has(.reference-app-shell) .dftr-side-account-arrow { width: 16px; flex: 0 0 16px; color: #809087; }
+
+  body:has(.reference-app-shell) #overlay.show {
+    position: fixed !important;
+    inset: 0 var(--dftr-reference-sidebar) 0 0 !important;
+    z-index: 40 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 22px !important;
+    background: #15231d72 !important;
+    overscroll-behavior: contain;
+  }
+  body:has(.reference-app-shell) #overlay.show.fullscreen {
+    display: block !important;
+    padding: 0 !important;
+    background: var(--dftr-reference-paper) !important;
+  }
+  body:has(.reference-app-shell) #overlay.show > #modal {
+    width: min(780px, 100%) !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - 44px) !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 26px !important;
+    border: 1px solid #e6e5dd;
+    border-radius: 22px !important;
+    background: var(--dftr-reference-card) !important;
+    color: var(--dftr-reference-ink);
+    box-shadow: 0 20px 55px #151d1826 !important;
+    overflow: auto;
+  }
+  body:has(.reference-app-shell) #overlay.show.fullscreen > #modal.fullscreen-modal {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 100dvh !important;
+    height: 100dvh !important;
+    padding: 28px clamp(24px, 3vw, 44px) 42px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--dftr-reference-paper) !important;
+    box-shadow: none !important;
+  }
+
+  body:has(.reference-app-shell) #directoryList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 10px;
+  }
+  body:has(.reference-app-shell) .directory-modal-head,
+  body:has(.reference-app-shell) .reports-page-head,
+  body:has(.reference-app-shell) .settings-page > header { margin-bottom: 18px; }
+  body:has(.reference-app-shell) #directorySearch,
+  body:has(.reference-app-shell) .settings-page input,
+  body:has(.reference-app-shell) .settings-page select {
+    min-height: 43px;
+    border: 1px solid #e2e5df;
+    border-radius: 12px;
+    background: var(--dftr-reference-card);
+  }
+  body:has(.reference-app-shell) #directorySearch { width: 100%; margin-bottom: 15px; }
+  body:has(.reference-app-shell) #directoryList .client {
+    min-height: 76px;
+    padding: 14px;
+    border: 1px solid #e8e7df;
+    border-radius: 17px;
+    background: var(--dftr-reference-card);
+    box-shadow: 0 6px 17px #29322709;
+  }
+
+  body:has(.reference-app-shell) .customer-detail-modal {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: var(--dftr-reference-paper) !important;
+  }
+  body:has(.reference-app-shell) .customer-detail-modal .modal-head,
+  body:has(.reference-app-shell) .customer-detail-modal .record-scroll,
+  body:has(.reference-app-shell) .customer-detail-modal .customer-hero,
+  body:has(.reference-app-shell) .customer-detail-modal .customer-detail-actions,
+  body:has(.reference-app-shell) .customer-detail-modal .customer-detail-filters { max-width: none !important; width: 100%; }
+  body:has(.reference-app-shell) .customer-detail-modal .modal-head { min-height: 44px; margin: 0 0 14px; padding: 0; background: transparent; }
+  body:has(.reference-app-shell) .customer-breadcrumb { margin: 0 0 14px; color: #596960; }
+  body:has(.reference-app-shell) .customer-detail-modal .customer-hero {
+    min-height: 285px;
+    margin-bottom: 14px;
+    padding: 28px;
+    border-radius: 27px;
+    background: linear-gradient(145deg, #087263, #06604f 70%, #0c705a);
+    box-shadow: 0 11px 28px #0d604020;
+  }
+  body:has(.reference-app-shell) .customer-hero-actions { top: 22px; left: 22px; right: auto; display: flex; flex-direction: column; gap: 8px; }
+  body:has(.reference-app-shell) .customer-hero-actions button { width: 42px; height: 42px; border-radius: 13px; }
+  body:has(.reference-app-shell) .customer-detail-modal .customer-detail-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 18px; }
+  body:has(.reference-app-shell) .customer-detail-modal .customer-detail-actions button { min-height: 48px; border-radius: 13px; }
+  body:has(.reference-app-shell) .customer-detail-modal .customer-detail-filters { justify-content: flex-start; margin-bottom: 12px; }
+  body:has(.reference-app-shell) .customer-detail-modal .record { margin-bottom: 8px; padding: 14px 16px; border-radius: 15px; }
+
+  body:has(.reference-app-shell) .reports-page { max-width: none !important; padding-bottom: 24px; }
+  body:has(.reference-app-shell) .reports-page-head { margin-bottom: 14px; }
+  body:has(.reference-app-shell) .reports-page-actions { justify-content: flex-start; gap: 9px; }
+  body:has(.reference-app-shell) .reports-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  body:has(.reference-app-shell) .reports-metrics article { min-height: 82px; padding: 16px; border-radius: 17px; background: var(--dftr-reference-card); }
+  body:has(.reference-app-shell) .reports-chart-card,
+  body:has(.reference-app-shell) .reports-data-card { border-radius: 19px; background: var(--dftr-reference-card); }
+  body:has(.reference-app-shell) .settings-page { max-width: none !important; padding-bottom: 24px; }
+  body:has(.reference-app-shell) .settings-section { margin-bottom: 13px; border: 1px solid #e7e7df; border-radius: 19px; background: var(--dftr-reference-card); box-shadow: 0 7px 20px #282d2408; }
+  body:has(.reference-app-shell) .settings-save { position: sticky; top: 10px; z-index: 4; }
+  body:has(.reference-app-shell) .personal-withdrawals-modal,
+  body:has(.reference-app-shell) .analytics-modal,
+  body:has(.reference-app-shell) .liquidity-modal { width: 100% !important; max-width: none !important; }
+
+  body:has(.reference-app-shell) .withdrawals-page,
+  body:has(.reference-app-shell) .liquidity-page { width: min(1120px, 100%); max-width: none; margin: 0 auto; }
+  body:has(.reference-app-shell) .withdrawals-page-hero,
+  body:has(.reference-app-shell) .liquidity-page-hero { min-height: 230px; padding: 28px 32px; border-radius: 25px; }
+  body:has(.reference-app-shell) .withdrawals-hero-top h1,
+  body:has(.reference-app-shell) .liquidity-hero-top h1 { font-size: 29px; }
+  body:has(.reference-app-shell) .withdrawals-hero-total,
+  body:has(.reference-app-shell) .liquidity-hero-total { max-width: 620px; }
+  body:has(.reference-app-shell) .withdrawals-page-list,
+  body:has(.reference-app-shell) .liquidity-page-list { margin-top: 20px; border-radius: 21px; }
+  body:has(.reference-app-shell) .withdrawals-page-row,
+  body:has(.reference-app-shell) .liquidity-page-row { min-height: 78px; padding: 12px 20px; }
+  body:has(.reference-app-shell) .withdrawals-row-copy strong,
+  body:has(.reference-app-shell) .liquidity-row-copy strong { font-size: 18px; }
+  body:has(.reference-app-shell) .reports-daily-card { margin-bottom: 18px; padding: 18px; border: 1px solid #e7e7df; border-radius: 19px; background: var(--dftr-reference-card); box-shadow: 0 7px 20px #282d2408; }
+  body:has(.reference-app-shell) .reports-daily-heading h2 { margin: 0; font-size: 21px; }
+  body:has(.reference-app-shell) .reports-daily-heading p { margin: 4px 0 14px; color: #78847d; font-size: 13px; }
+  body:has(.reference-app-shell) .reports-daily-filter { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+  body:has(.reference-app-shell) .daily-report-filter-controls { display: flex; align-items: center; gap: 8px; }
+  body:has(.reference-app-shell) .daily-report-filter-controls input,
+  body:has(.reference-app-shell) .daily-report-filter-controls button { min-height: 40px; border: 1px solid #e3e5df; border-radius: 11px; background: #fff; color: var(--dftr-reference-ink); font: inherit; }
+  body:has(.reference-app-shell) .daily-report-filter-controls input { padding: 7px 10px; }
+  body:has(.reference-app-shell) .daily-report-filter-controls button { padding: 7px 13px; background: var(--dftr-reference-green); color: #fff; font-weight: 650; }
+}
+
+@media (min-width: 900px) and (max-width: 1080px) {
+  :root { --dftr-reference-sidebar: 224px; }
+  body:has(.reference-app-shell) .customer-detail-modal .customer-detail-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 899px) {
+  .dftr-side-brand,
+  .dftr-side-account { display: none !important; }
+}

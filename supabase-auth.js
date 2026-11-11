@@ -234,6 +234,7 @@
     syncStartedFor = user.id;
     activeUser = user;
     window.DaftariCurrentUser = user;
+    window.dispatchEvent(new CustomEvent('daftari:auth-change', { detail: { user } }));
     showGate();
     setStatus('جارٍ تأمين حسابك واستعادة بيانات الدفتر…');
     authSubmit.disabled = true;
@@ -351,6 +352,7 @@
     if (event === 'SIGNED_OUT' || !session) {
       activeUser = null;
       window.DaftariCurrentUser = null;
+      window.dispatchEvent(new CustomEvent('daftari:auth-change', { detail: { user: null } }));
       syncStartedFor = '';
       document.querySelector('#daftariAccountButton')?.remove();
       showGate();
