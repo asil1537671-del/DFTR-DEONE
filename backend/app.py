@@ -20,11 +20,17 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import Base, User, Client, Record, Withdrawal, Settings, LegacyArchive, serialize, camel
-from .logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded
-from .database import initialize_database, make_engine
+if __package__:
+    from .models import Base, User, Client, Record, Withdrawal, Settings, LegacyArchive, serialize, camel
+    from .logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded
+    from .database import initialize_database, make_engine
+else:
+    from models import Base, User, Client, Record, Withdrawal, Settings, LegacyArchive, serialize, camel
+    from logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded
+    from database import initialize_database, make_engine
 
-ROOT = Path(__file__).resolve().parents[1]
+MODULE_ROOT = Path(__file__).resolve().parent
+ROOT = MODULE_ROOT.parent if (MODULE_ROOT.parent / 'frontend').is_dir() else MODULE_ROOT
 load_dotenv(ROOT / '.env')
 COLLECTIONS = {'clients': Client, 'records': Record, 'withdrawals': Withdrawal}
 

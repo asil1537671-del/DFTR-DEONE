@@ -5,7 +5,11 @@ from fpdf import FPDF
 from fpdf.enums import TableBordersLayout, TableBorderStyle, TableCellStyle
 from fpdf.fonts import FontFace
 
-FONTS = Path(__file__).resolve().parents[1] / 'frontend' / 'public' / 'fonts'
+MODULE_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = MODULE_ROOT.parent if (MODULE_ROOT.parent / 'frontend' / 'public' / 'fonts').is_dir() else MODULE_ROOT
+FONTS = REPO_ROOT / 'frontend' / 'public' / 'fonts'
+if not FONTS.is_dir():
+    FONTS = MODULE_ROOT / 'fonts'
 PRIMARY = '#0c5c50'
 
 

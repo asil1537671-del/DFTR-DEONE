@@ -3,7 +3,10 @@ import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-from .models import Base
+if __package__:
+    from .models import Base
+else:
+    from models import Base
 
 
 def database_url(value):

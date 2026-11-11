@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "python -m pip install -r requirements.txt",
+  "buildCommand": "python -m compileall -q .",
+  "outputDirectory": null,
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "fonts/**",
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    { "src": "/api(?:/.*)?", "dest": "/api/index.py" }
+  ]
+}

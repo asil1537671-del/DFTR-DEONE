@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
-from backend.api import create_app
+from backend.app import create_app
 from backend.models import Base, User
 
 
