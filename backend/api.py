@@ -1,9 +1,11 @@
 import os
 import re
+import json
 from copy import deepcopy
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
+from threading import Lock
 from uuid import uuid4
 from urllib.parse import urlsplit
 
@@ -14,12 +16,13 @@ from email_validator import validate_email, EmailNotValidError
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, Body
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import Base, User, Client, Record, Withdrawal, Settings, serialize, camel
+from .models import Base, User, Client, Record, Withdrawal, Settings, LegacyArchive, serialize, camel
 from .logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded
+from .database import initialize_database, make_engine
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / '.env')
@@ -27,14 +30,23 @@ COLLECTIONS = {'clients': Client, 'records': Record, 'withdrawals': Withdrawal}
 
 
 def create_app(database_url=None, secret=None):
-    engine = create_engine(database_url or os.environ.get('DATABASE_URL', 'postgresql+psycopg:///daftari'), pool_pre_ping=True)
+    engine = make_engine(database_url)
+    initialization_lock = Lock()
+    initialized = False
+
+    def ensure_database():
+        nonlocal initialized
+        with initialization_lock:
+            if not initialized:
+                initialize_database(engine)
+                initialized = True
     secret = secret or os.environ.get('JWT_SECRET')
     if not secret or len(secret) < 32:
         raise RuntimeError('JWT_SECRET must contain at least 32 characters')
 
     @asynccontextmanager
     async def lifespan(app):
-        Base.metadata.create_all(engine)
+        ensure_database()
         yield
 
     app = FastAPI(title='دفتري', lifespan=lifespan)
@@ -58,6 +70,7 @@ def create_app(database_url=None, secret=None):
         return JSONResponse({'detail': str(exc)}, status_code=422)
 
     def db():
+        ensure_database()
         with Session(engine) as session:
             yield session
 
@@ -73,9 +86,9 @@ def create_app(database_url=None, secret=None):
             raise HTTPException(401, 'يرجى تسجيل الدخول')
         return user
 
-    def login_cookie(response, user):
+    def login_cookie(response, user, request):
         token = jwt.encode({'sub': user.id, 'iat': datetime.now(timezone.utc), 'exp': datetime.now(timezone.utc) + timedelta(days=7)}, secret, algorithm='HS256')
-        response.set_cookie('daftari_session', token, httponly=True, samesite='lax', secure=os.getenv('COOKIE_SECURE', 'false').lower() == 'true', max_age=604800, path='/')
+        response.set_cookie('daftari_session', token, httponly=True, samesite='lax', secure=request.url.scheme == 'https' or os.getenv('COOKIE_SECURE', 'false').lower() == 'true', max_age=604800, path='/')
 
     def config(session, user):
         row = session.get(Settings, (user.id, 'main'))
@@ -99,7 +112,7 @@ def create_app(database_url=None, secret=None):
         return {'googleClientId': os.getenv('GOOGLE_CLIENT_ID', '')}
 
     @app.post('/api/auth/signup')
-    def signup(response: Response, body: dict = Body(...), session: Session = Depends(db)):
+    def signup(request: Request, response: Response, body: dict = Body(...), session: Session = Depends(db)):
         email, password = credentials(body)
         if len(password) < 6:
             raise HTTPException(422, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل')
@@ -111,20 +124,20 @@ def create_app(database_url=None, secret=None):
             session.rollback()
             raise HTTPException(409, 'البريد الإلكتروني مستخدم بالفعل')
         config(session, user)
-        login_cookie(response, user)
+        login_cookie(response, user, request)
         return serialize(user)
 
     @app.post('/api/auth/login')
-    def login(response: Response, body: dict = Body(...), session: Session = Depends(db)):
+    def login(request: Request, response: Response, body: dict = Body(...), session: Session = Depends(db)):
         email, password = credentials(body)
         user = session.scalar(select(User).where(User.email == email))
         if not user or not user.password_hash or not bcrypt.checkpw(password.encode(), user.password_hash.encode()):
             raise HTTPException(401, 'البريد الإلكتروني أو كلمة المرور غير صحيحة')
-        login_cookie(response, user)
+        login_cookie(response, user, request)
         return serialize(user)
 
     @app.post('/api/auth/google')
-    def google(response: Response, body: dict = Body(...), session: Session = Depends(db)):
+    def google(request: Request, response: Response, body: dict = Body(...), session: Session = Depends(db)):
         audience = os.getenv('GOOGLE_CLIENT_ID')
         if not audience:
             raise HTTPException(400, 'تسجيل الدخول عبر Google غير مفعّل')
@@ -148,7 +161,7 @@ def create_app(database_url=None, secret=None):
             user.google_sub = info['sub']
             session.commit()
         config(session, user)
-        login_cookie(response, user)
+        login_cookie(response, user, request)
         return serialize(user)
 
     @app.post('/api/auth/reset')
@@ -239,6 +252,31 @@ def create_app(database_url=None, secret=None):
     def backup(user=Depends(current), session: Session = Depends(db)):
         return {'version': 1, 'exportedAt': datetime.now(timezone.utc).isoformat(), 'settings': serialize(config(session, user)), **{coll: rows(session, model, user) for coll, model in COLLECTIONS.items()}}
 
+    @app.post('/api/legacy-archives')
+    def save_legacy_archive(body: dict = Body(...), user=Depends(current), session: Session = Depends(db)):
+        data = body.get('data')
+        if not isinstance(data, dict):
+            raise ValueError('ملف الأرشيف غير صالح')
+        size = len(json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
+        if size > 4 * 1024 * 1024:
+            raise ValueError('ملف النسخة القديمة أكبر من حد الرفع؛ قسّم الملف أو احذف المرفقات المحلية ثم أعد التصدير')
+        row = LegacyArchive(user_id=user.id, label=str(body.get('label') or 'نسخة التطبيق السابق')[:160], data=data)
+        session.add(row)
+        session.commit()
+        return {'id': row.id, 'label': row.label, 'createdAt': row.created_at.isoformat()}
+
+    @app.get('/api/legacy-archives')
+    def list_legacy_archives(user=Depends(current), session: Session = Depends(db)):
+        archives = session.scalars(select(LegacyArchive).where(LegacyArchive.user_id == user.id).order_by(LegacyArchive.created_at.desc())).all()
+        return [{'id': row.id, 'label': row.label, 'createdAt': row.created_at.isoformat()} for row in archives]
+
+    @app.get('/api/legacy-archives/{archive_id}')
+    def get_legacy_archive(archive_id: str, user=Depends(current), session: Session = Depends(db)):
+        row = session.get(LegacyArchive, (user.id, archive_id))
+        if not row:
+            raise HTTPException(404, 'الأرشيف غير موجود')
+        return {'id': row.id, 'label': row.label, 'createdAt': row.created_at.isoformat(), 'data': row.data}
+
     @app.post('/api/restore')
     def restore(body: dict = Body(...), user=Depends(current), session: Session = Depends(db)):
         if body.get('version') != 1 or any(not isinstance(body.get(k, []), list) for k in COLLECTIONS):
@@ -247,6 +285,15 @@ def create_app(database_url=None, secret=None):
             raise ValueError('الملف كبير جدًا')
         counts = {key: 0 for key in COLLECTIONS}
         try:
+            if body.get('replaceSettings') and body.get('settings'):
+                row = session.get(Settings, (user.id, 'main'))
+                clean_settings = mapped(Settings, validate_settings(body['settings']))
+                if row:
+                    for key, value in clean_settings.items():
+                        setattr(row, key, value)
+                else:
+                    session.add(Settings(user_id=user.id, id='main', **clean_settings))
+                session.flush()
             for coll, model in COLLECTIONS.items():
                 for item in body.get(coll, []):
                     row_id = valid_id(item.get('id'))
@@ -256,7 +303,7 @@ def create_app(database_url=None, secret=None):
                     session.add(model(user_id=user.id, id=row_id, **mapped(model, clean)))
                     session.flush()
                     counts[coll] += 1
-            if not session.get(Settings, (user.id, 'main')) and body.get('settings'):
+            if not body.get('replaceSettings') and not session.get(Settings, (user.id, 'main')) and body.get('settings'):
                 session.add(Settings(user_id=user.id, id='main', **mapped(Settings, validate_settings(body['settings']))))
             session.commit()
         except Exception:

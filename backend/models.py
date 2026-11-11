@@ -85,6 +85,15 @@ class Settings(Owned, Base):
     commissions: Mapped[dict] = mapped_column(JSON)
 
 
+class LegacyArchive(Base):
+    __tablename__ = 'legacy_archives'
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    label: Mapped[str] = mapped_column(String(160), default='نسخة التطبيق السابق')
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 def camel(value):
     first, *rest = value.split('_')
     return first + ''.join(part.title() for part in rest)

@@ -97,3 +97,9 @@ DB_POOL=null VERCEL=1 .venv/bin/uvicorn api.index:app --host 127.0.0.1 --port 80
 ```
 
 This exercises the same ASGI entrypoint and pip-only renderer, but is not a hosted Vercel routing/deployment test. Keep the existing IP service using `backend.main:app` and `deploy.sh`; its environment/database are independent and preserved. Serverless has no durable local disk: app data belongs in PostgreSQL and PDF bytes are generated in memory. Vercel request/runtime/response-size limits still apply to exceptionally large backups or PDFs; use the IP service for exports exceeding the platform's limits.
+
+## Import data from DFTR-DEONE
+
+The newer app uses PostgreSQL; it does not read the older Supabase `user_ledgers` table directly. To move a ledger, sign in to the old app, download its JSON backup from **النسخة الاحتياطية**, then sign in or create an account in the new app and choose **الإعدادات → استعادة من نسخة**. The importer accepts the old `daftari-backup` v2 format and Supabase ledger JSON exports. It adds clients, their debt/payment records, and personal withdrawals without replacing matching records. It imports the old currency and commission settings for that account.
+
+The original uploaded JSON is saved in a private, account-owned archive that can be downloaded later from Settings. The newer app has no screens for the old standalone profit entries, liquidity balances, or trash, so those remain in the archive rather than being discarded or misrepresented. Files stored separately in the old local `uploads/` or `data/` folders are not part of the JSON backup and must be copied separately if needed. On Vercel, the import file limit is 3.8 MB.
