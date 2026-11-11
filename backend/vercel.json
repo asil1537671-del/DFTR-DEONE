@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "echo 'Dependencies are installed by the Vercel Python runtime'",
   "buildCommand": "echo 'Python functions are built by Vercel'",
-  "outputDirectory": null,
+  "outputDirectory": "public",
   "functions": {
     "api/index.py": {
       "includeFiles": "fonts/**",
