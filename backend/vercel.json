@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "uv pip install --system --python 3.12 -r requirements.txt",
-  "buildCommand": "python -m compileall -q .",
+  "installCommand": "echo 'Dependencies are installed by the Vercel Python runtime'",
+  "buildCommand": "echo 'Python functions are built by Vercel'",
   "outputDirectory": null,
   "functions": {
     "api/index.py": {
