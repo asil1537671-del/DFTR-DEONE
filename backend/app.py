@@ -300,15 +300,64 @@ def create_app(database_url=None, secret=None):
                 else:
                     session.add(Settings(user_id=user.id, id='main', **clean_settings))
                 session.flush()
+
+            # Fetch existing IDs in batches instead of issuing a SELECT and
+            # flush for every imported row. Large restores otherwise exceed
+            # the browser's request timeout on serverless deployments.
+            pending = {}
             for coll, model in COLLECTIONS.items():
+                unique_items = []
+                seen_ids = set()
                 for item in body.get(coll, []):
+                    if not isinstance(item, dict):
+                        raise ValueError('صف في النسخة الاحتياطية غير صالح')
                     row_id = valid_id(item.get('id'))
-                    if session.get(model, (user.id, row_id)):
+                    if row_id in seen_ids:
                         continue
+                    seen_ids.add(row_id)
+                    unique_items.append((row_id, item))
+
+                existing_ids = set()
+                for offset in range(0, len(unique_items), 500):
+                    batch_ids = [row_id for row_id, _ in unique_items[offset:offset + 500]]
+                    existing_ids.update(session.scalars(
+                        select(model.id).where(
+                            model.user_id == user.id,
+                            model.id.in_(batch_ids),
+                        )
+                    ).all())
+                pending[coll] = [
+                    (row_id, item) for row_id, item in unique_items
+                    if row_id not in existing_ids
+                ]
+
+            client_rows = []
+            for row_id, item in pending['clients']:
+                clean = prepare('clients', item, session, user)
+                client_rows.append(Client(user_id=user.id, id=row_id, **mapped(Client, clean)))
+            session.add_all(client_rows)
+            counts['clients'] = len(client_rows)
+            session.flush()
+
+            # Load referenced clients once so prepare() can validate records
+            # from the session identity map instead of querying per record.
+            record_client_ids = list(dict.fromkeys(
+                str(item.get('clientId', '')) for _, item in pending['records']
+            ))
+            for offset in range(0, len(record_client_ids), 500):
+                session.scalars(select(Client).where(
+                    Client.user_id == user.id,
+                    Client.id.in_(record_client_ids[offset:offset + 500]),
+                )).all()
+
+            for coll in ('records', 'withdrawals'):
+                model = COLLECTIONS[coll]
+                rows_to_add = []
+                for row_id, item in pending[coll]:
                     clean = prepare(coll, item, session, user)
-                    session.add(model(user_id=user.id, id=row_id, **mapped(model, clean)))
-                    session.flush()
-                    counts[coll] += 1
+                    rows_to_add.append(model(user_id=user.id, id=row_id, **mapped(model, clean)))
+                session.add_all(rows_to_add)
+                counts[coll] = len(rows_to_add)
             if not body.get('replaceSettings') and not session.get(Settings, (user.id, 'main')) and body.get('settings'):
                 session.add(Settings(user_id=user.id, id='main', **mapped(Settings, validate_settings(body['settings']))))
             session.commit()

@@ -2,7 +2,7 @@ import React,{createContext,useContext,useEffect,useRef,useState} from 'react';
 import {aggregate} from './logic';
 import {enqueue,acknowledge,uuid} from './outbox';
 const Context=createContext();
-export async function api(path,options={}){const response=await fetch('/api'+path,{credentials:'same-origin',signal:AbortSignal.timeout(20000),...options,headers:{'Content-Type':'application/json',...options.headers},body:options.body===undefined?undefined:JSON.stringify(options.body)});let body;try{body=await response.json()}catch{body={}}if(!response.ok){const error=new Error(typeof body.detail==='string'?body.detail:'تعذّر تنفيذ الطلب');error.status=response.status;throw error}return body}
+export async function api(path,options={}){const {timeoutMs=20000,...request}=options;const response=await fetch('/api'+path,{credentials:'same-origin',signal:AbortSignal.timeout(timeoutMs),...request,headers:{'Content-Type':'application/json',...request.headers},body:request.body===undefined?undefined:JSON.stringify(request.body)});let body;try{body=await response.json()}catch{body={}}if(!response.ok){const error=new Error(typeof body.detail==='string'?body.detail:'تعذّر تنفيذ الطلب');error.status=response.status;throw error}return body}
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
 export function Provider({children}){
  const [user,setUser]=useState(null),[ready,setReady]=useState(false),[data,setData]=useState({clients:[],records:[],withdrawals:[],settings:null}),[online,setOnline]=useState(navigator.onLine),[queue,setQueue]=useState([]),[error,setError]=useState(''),[lastSync,setLastSync]=useState('');
