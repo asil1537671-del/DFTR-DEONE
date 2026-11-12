@@ -30,15 +30,33 @@ def rounded(value, places=2):
     return float((Decimal(str(value)) * scale + Decimal('.5')).to_integral_value(rounding=ROUND_FLOOR) / scale)
 
 
+def _has_override(value):
+    if isinstance(value, dict):
+        return any(_has_override(item) for item in value.values())
+    return value is not None and value != ''
+
+
+def custom_pricing_enabled(client):
+    client = client or {}
+    rates = client.get('rates') or {}
+    flag = client.get('customPricingEnabled', rates.get('_customEnabled'))
+    if flag is not None:
+        return flag is True or str(flag).strip().lower() in ('1', 'true', 'yes', 'on')
+    legacy_rates = {key: value for key, value in rates.items() if key != '_customEnabled'}
+    return _has_override(legacy_rates) or _has_override(client.get('commissions') or {})
+
+
 def exchange_rate(settings, client, kind, currency):
-    override = number((client or {}).get('rates', {}).get(kind, {}).get(currency))
+    override = number((client or {}).get('rates', {}).get(kind, {}).get(currency)) if custom_pricing_enabled(client) else 0
     return override if override > 0 else number(settings.get('rates', {}).get(kind, {}).get(currency), 1) or 1
 
 
 def commission_rule(settings, client, kind):
     rule = deepcopy(DEFAULTS['commissions'][kind])
-    for source in [settings.get('commissions', {}).get(kind, {}),
-                   (client or {}).get('commissions', {}).get(kind, {})]:
+    sources = [settings.get('commissions', {}).get(kind, {})]
+    if custom_pricing_enabled(client):
+        sources.append((client or {}).get('commissions', {}).get(kind, {}))
+    for source in sources:
         for key, value in source.items():
             if key == 'byCurrency':
                 rule[key].update({k: number(v) for k, v in value.items() if v is not None and v != ''})

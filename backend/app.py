@@ -22,11 +22,11 @@ from sqlalchemy.orm import Session
 
 if __package__:
     from .models import Base, User, Client, Record, Withdrawal, Settings, LiquiditySettings, LiquidityMonth, LegacyArchive, serialize, camel
-    from .logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded
+    from .logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded, custom_pricing_enabled
     from .database import initialize_database, make_engine
 else:
     from models import Base, User, Client, Record, Withdrawal, Settings, LiquiditySettings, LiquidityMonth, LegacyArchive, serialize, camel
-    from logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded
+    from logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded, custom_pricing_enabled
     from database import initialize_database, make_engine
 
 MODULE_ROOT = Path(__file__).resolve().parent
@@ -219,7 +219,13 @@ def create_app(database_url=None, secret=None):
             name = str(body.get('name', '')).strip()
             if not name or len(name) > 200:
                 raise ValueError('أدخل اسم العميل')
-            return {'name': name, 'phone': str(body.get('phone', ''))[:50], 'note': str(body.get('note', ''))[:5000], 'currency': currency, 'archived': bool(body.get('archived', False)), 'rates': numeric_tree(body.get('rates', {})), 'commissions': numeric_tree(body.get('commissions', {}))}
+            rates = numeric_tree(body.get('rates', {}))
+            commissions = numeric_tree(body.get('commissions', {}))
+            pricing = {'rates': rates, 'commissions': commissions}
+            if body.get('customPricingEnabled') is not None:
+                pricing['customPricingEnabled'] = body.get('customPricingEnabled')
+            rates['_customEnabled'] = int(custom_pricing_enabled(pricing))
+            return {'name': name, 'phone': str(body.get('phone', ''))[:50], 'note': str(body.get('note', ''))[:5000], 'currency': currency, 'archived': bool(body.get('archived', False)), 'rates': rates, 'commissions': commissions}
         day = str(body.get('date', date.today().isoformat()))
         date.fromisoformat(day)
         clock = str(body.get('time') or datetime.now().strftime('%H:%M'))
