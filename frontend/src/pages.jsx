@@ -64,8 +64,7 @@ export function ClientPage(){
     <div className="client-transaction-body">
      <div className="client-transaction-main"><div className="client-transaction-title"><b className={r.type==='debt'?'debt':'pay'}>{r.type==='debt'?'دين':'تسديد'}</b><strong className="num">{signed(r.signedAmount,symbol(settings,r.currency))}</strong>{r.voided&&<span className="chip">ملغاة</span>}</div><div className="actions client-transaction-actions"><button className="icon" title="تعديل العملية" aria-label="تعديل العملية" onClick={()=>setEntry({record:r,type:r.type})}><Pencil size={15}/></button><button className="icon debt" title="حذف العملية" aria-label="حذف العملية" onClick={()=>setConfirmation({kind:'record',row:r})}><Trash2 size={15}/></button><button className="icon" title={r.voided?'استرجاع العملية':'إلغاء العملية'} aria-label={r.voided?'استرجاع العملية':'إلغاء العملية'} onClick={()=>r.voided?toggle(r):setConfirmation({kind:'void',row:r})}>{r.voided?<RotateCcw size={15}/>:<X size={15}/>}</button></div></div>
      <p className="client-transaction-meta num">{r.date} · {r.time} · سعر {r.exchangeRate} · {money(r.usdEquivalent)}</p>
-      {r.commissionAmount>0&&<p className="client-transaction-meta">عمولة {money(r.commissionAmount,symbol(settings,r.currency))} ({money(r.commissionUsd,'₮')})</p>}
-      {r.currency==='USDT'&&<p className="client-transaction-meta">المبلغ المدخل {money(r.amount,symbol(settings,r.currency))}</p>}
+     {(r.commissionAmount>0||r.currency==='USDT')&&<p className="client-transaction-meta">{r.commissionAmount>0&&<>عمولة {money(r.commissionAmount,symbol(settings,r.currency))} ({money(r.commissionUsd,'₮')})</>}{r.commissionAmount>0&&r.currency==='USDT'&&' · '}{r.currency==='USDT'&&<>المبلغ المدخل {money(r.amount,symbol(settings,r.currency))}</>}</p>}
      {r.note&&<p className="client-transaction-note">{r.note}</p>}<Pending row={r}/>
     </div>
    </article>)}</div>}
