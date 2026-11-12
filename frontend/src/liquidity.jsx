@@ -162,6 +162,7 @@ export function LiquidityPage(){
  const [newCurrency,setNewCurrency]=useState({code:'',name:'',symbol:'',rate:''});
  const [busy,setBusy]=useState(false),[rateBusy,setRateBusy]=useState(false),[exportBusy,setExportBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[exportError,setExportError]=useState(''),[exportNotice,setExportNotice]=useState('');
  const initialized=useRef(false);
+ const amountRefs=useRef([]);
  const currentRecord=liquidity.find(row=>row.month===month);
 
  useEffect(()=>{
@@ -196,7 +197,10 @@ export function LiquidityPage(){
  },{});
 
  function updateEntry(id,key,value){setEntries(current=>current.map(entry=>entry.id===id?{...entry,[key]:value}:entry));setNotice('');}
- function addEntry(){setEntries(current=>[...current,newEntry(currencies[0]?.code||'USD')]);}
+ function focusAmount(index){setTimeout(()=>{const input=amountRefs.current[index];if(!input)return;input.focus({preventScroll:true});input.scrollIntoView({behavior:'smooth',block:'center'});},40);}
+ function appendEntry(currency=currencies[0]?.code||'USD'){const index=entries.length;setEntries(current=>[...current,newEntry(currency)]);focusAmount(index);}
+ function addEntry(){appendEntry();}
+ function advanceAmount(entry,index){if(index<entries.length-1){focusAmount(index+1);return}if(Number(entry.amount)>0)appendEntry(entry.currency);}
  function removeEntry(id){setEntries(current=>current.length===1?[newEntry(currencies[0]?.code||'USD')]:current.filter(entry=>entry.id!==id));}
 
  async function saveMonth(){
@@ -306,14 +310,13 @@ export function LiquidityPage(){
   {showEntry&&<Sheet title={currentRecord?'تعديل سيولة الشهر':'إضافة سيولة الشهر'} subtitle={monthName(month)} wide onClose={()=>setShowEntry(false)} footer={<><Button icon={Save} disabled={busy||!configDraft} onClick={saveMonth}>{busy?'جارٍ الحفظ…':currentRecord?'حفظ تعديل الشهر':'حفظ سيولة الشهر'}</Button><Button kind="ghost" onClick={()=>setShowEntry(false)}>إلغاء</Button></>}>
    <div className="stack">
     <div className="liquidity-month-total"><small>صافي المبالغ بالدولار</small><strong>{signedMoney(draftAmount)}</strong></div>
-    <p className="tiny">أدخل المبلغ بدون إشارة، ثم اختر هل هو لنا أم علينا. الوصف اختياري، ويمكن تكرار العملة لأكثر من حساب أو مكان.</p>
+    <p className="tiny">أدخل المبلغ بدون إشارة، ثم اختر هل هو لنا أم علينا. الوصف اختياري، ويمكن تكرار العملة لأكثر من حساب أو مكان. اضغط Enter أو «التالي» للانتقال إلى المبلغ التالي وإظهاره تلقائيًا.</p>
     <div className="liquidity-entry-list">
-     <div className="liquidity-entry-labels"><span>المبلغ الموجود</span><span>العملة</span><span/><span>وصف الرصيد (اختياري)</span><span/></div>
-     {entries.map(entry=><div className="liquidity-entry" key={entry.id}>
-      <Field label="المبلغ الموجود" type="number" min="0" step="any" inputMode="decimal" placeholder="0" value={entry.amount} onChange={event=>updateEntry(entry.id,'amount',event.target.value)}/>
+     <div className="liquidity-entry-labels"><span>المبلغ الموجود</span><span>العملة</span><span>الوصف / الجهة</span><span/></div>
+     {entries.map((entry,index)=><div className="liquidity-entry" key={entry.id}>
+      <Field label="المبلغ الموجود"><input ref={element=>amountRefs.current[index]=element} className="field num" aria-label={`المبلغ الموجود ${index+1}`} type="number" min="0" step="any" inputMode="decimal" enterKeyHint="next" placeholder="0" value={entry.amount} onChange={event=>updateEntry(entry.id,'amount',event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();advanceAmount(entry,index);}}}/></Field>
       <Field label="العملة"><select className="field liquidity-currency-select" value={entry.currency} aria-label={`العملة ${currencies.find(currency=>currency.code===entry.currency)?.name||entry.currency}`} title={currencies.find(currency=>currency.code===entry.currency)?.name||entry.currency} onChange={event=>updateEntry(entry.id,'currency',event.target.value)}>{currencies.map(currency=><option key={currency.code} value={currency.code}>{currencyMark(currency)}</option>)}</select></Field>
-      <div className="liquidity-entry-direction" role="group" aria-label="جهة المبلغ"><button type="button" className={`liquidity-direction-option ${entry.direction!=='owed'?'selected':''}`} aria-pressed={entry.direction!=='owed'} onClick={()=>updateEntry(entry.id,'direction','ours')}>لنا (+)</button><button type="button" className={`liquidity-direction-option ${entry.direction==='owed'?'selected owed':''}`} aria-pressed={entry.direction==='owed'} onClick={()=>updateEntry(entry.id,'direction','owed')}>علينا (−)</button></div>
-      <Field label="وصف الرصيد (اختياري)" value={entry.description} placeholder="جيب كريمي، حساب البنك…" onChange={event=>updateEntry(entry.id,'description',event.target.value)}/>
+      <div className="liquidity-entry-meta"><Field label="وصف الرصيد (اختياري)" value={entry.description} placeholder="جيب كريمي، حساب البنك…" onChange={event=>updateEntry(entry.id,'description',event.target.value)}/><div className="liquidity-entry-direction" role="group" aria-label="جهة المبلغ"><button type="button" className={`liquidity-direction-option ${entry.direction!=='owed'?'selected':''}`} aria-pressed={entry.direction!=='owed'} onClick={()=>updateEntry(entry.id,'direction','ours')}>لنا (+)</button><button type="button" className={`liquidity-direction-option ${entry.direction==='owed'?'selected owed':''}`} aria-pressed={entry.direction==='owed'} onClick={()=>updateEntry(entry.id,'direction','owed')}>علينا (−)</button></div></div>
       <button className="icon liquidity-remove" aria-label="حذف المبلغ" onClick={()=>removeEntry(entry.id)}><Trash2 size={16}/></button>
      </div>)}
     </div>
