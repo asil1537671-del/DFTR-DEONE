@@ -247,6 +247,9 @@ h1{line-height:1.2}h2{font-size:17px}
 .appearance-setting{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px}
 .appearance-setting h2{font-size:16px}
 @media(max-width:390px){.appearance-setting{align-items:stretch;flex-direction:column}.appearance-setting .btn{width:100%}}
+.withdrawal-detail-actions{display:grid;grid-template-columns:1.15fr .85fr 1fr;gap:8px;width:100%}
+.withdrawal-detail-actions .btn{min-width:0;padding-inline:10px;font-size:12px;gap:6px}
+@media(max-width:390px){.withdrawal-detail-actions{grid-template-columns:1fr 1fr}.withdrawal-detail-actions .btn:first-child{grid-column:1/-1}}
 
 @media screen{
  html[data-theme="dark"]{color-scheme:dark;color:#e7efec;background:#111916;--primary:#55bcae;--muted:#a6b6b0;--line:rgba(220,239,233,.13);--paper:#1b2723;--debt:#f07b70;--pay:#58c986;--gold:#d6ad5e}
