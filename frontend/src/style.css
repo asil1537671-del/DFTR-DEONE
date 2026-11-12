@@ -260,9 +260,10 @@ html[data-theme="dark"] .custom-pricing-switch.enabled{color:#62d0c4}
  .liquidity-entry-actions>.btn{width:100%}
  .liquidity-currency-form{grid-template-columns:1fr 1fr}
  .liquidity-currency-form>.btn{grid-column:1/-1}
- .liquidity-kpis{grid-template-columns:1fr}
- .liquidity-kpis .tile{padding:14px 12px}
- .liquidity-kpis .tile strong{font-size:18px}
+ .liquidity-kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .liquidity-kpis .tile{padding:10px 7px;gap:4px;text-align:center}
+ .liquidity-kpis .tile small{font-size:10px;line-height:1.4}
+ .liquidity-kpis .tile strong{font-size:15px;overflow-wrap:anywhere}
  .liquidity-chart-wrap{padding-inline:8px}
  .liquidity-chart-label{font-size:18px}
  .liquidity-direction-option{min-width:72px;font-size:11px}
