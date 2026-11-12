@@ -19,6 +19,22 @@ function monthName(value){
  return new Intl.DateTimeFormat('ar',{month:'short',year:'numeric'}).format(new Date(year,month-1,1));
 }
 
+function isDailyPeriod(value){return /^\d{4}-\d{2}-\d{2}$/.test(String(value||''));}
+
+function periodName(value){
+ if(!isDailyPeriod(value))return monthName(value);
+ const [year,month,day]=value.split('-').map(Number);
+ return new Intl.DateTimeFormat('ar',{day:'numeric',month:'long',year:'numeric'}).format(new Date(year,month-1,day));
+}
+
+function periodNoun(value){return isDailyPeriod(value)?'اليوم':'الشهر';}
+
+function previousRecord(rows,record){
+ if(!record)return null;
+ if(isDailyPeriod(record.month))return [...rows].filter(row=>isDailyPeriod(row.month)&&row.month<record.month).sort((a,b)=>b.month.localeCompare(a.month))[0]||null;
+ return rows.find(row=>row.month===monthBefore(record.month))||null;
+}
+
 function currencyMark(currency){
  const marks={USD:'🇺🇸 $',SAR:'🇸🇦 ر.س',YER:'🇾🇪 ر.ي',USDT:'₮'};
  return marks[currency.code]||currency.symbol||currency.code;
@@ -83,7 +99,7 @@ async function liquidityImage(record,change,percent){
  const right=width-92;
  text('دفتري · السيولة',right,100,'600 27px Tajawal, sans-serif','#d8fffb');
  text('ملخص السيولة',right,162,'700 39px Tajawal, sans-serif','#ffffff');
- text(`الشهر: ${monthName(record.month)}`,right,212,'500 25px Tajawal, sans-serif','#e5fffd');
+ text(`${isDailyPeriod(record.month)?'التاريخ':'الشهر'}: ${periodName(record.month)}`,right,212,'500 25px Tajawal, sans-serif','#e5fffd');
  text('صافي السيولة بالدولار',right,284,'500 22px Tajawal, sans-serif','#d8fffb');
  text(signedMoney(monthTotal(record)),112,300,'700 43px Tajawal, sans-serif','#ffffff','left','ltr');
  const tableTop=394;
@@ -102,16 +118,16 @@ async function liquidityImage(record,change,percent){
  });
  const summaryTop=tableTop+36+entries.length*rowHeight;
  roundRect(context,70,summaryTop,width-140,112,18,'#e5f5f2');
- text('مقارنة بالشهر السابق',right-14,summaryTop+40,'600 21px Tajawal, sans-serif','#315e60');
- const changeLabel=change===null?'لا يوجد سجل للشهر السابق':`${change>0?'+':''}${money(change)}`;
+ text(isDailyPeriod(record.month)?'مقارنة باليوم السابق':'مقارنة بالشهر السابق',right-14,summaryTop+40,'600 21px Tajawal, sans-serif','#315e60');
+ const changeLabel=change===null?'لا يوجد سجل سابق':`${change>0?'+':''}${money(change)}`;
  text(changeLabel,right-14,summaryTop+78,'700 25px Tajawal, sans-serif','#0a7977');
  text(percent===null?'—':`${percent>0?'+':''}${num(percent)}٪`,128,summaryTop+65,'700 25px Tajawal, sans-serif','#0a7977','left','ltr');
- text('أسعار الصرف محفوظة مع سجل الشهر',right,summaryTop+160,'500 16px Tajawal, sans-serif','#62756f');
+ text(`أسعار الصرف محفوظة مع سجل ${periodNoun(record.month)}`,right,summaryTop+160,'500 16px Tajawal, sans-serif','#62756f');
  return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('تعذّر تجهيز صورة التقرير')),'image/png'));
 }
 
-function LiquidityChart({rows}){
- if(!rows.length)return <p className="report-empty">سجّل رصيد شهر لعرض تطوّر السيولة.</p>;
+function LiquidityChart({rows,daily}){
+ if(!rows.length)return <p className="report-empty">سجّل رصيدًا {daily?'يوميًا':'شهريًا'} لعرض تطوّر السيولة.</p>;
  const width=720,height=230,padX=28,top=20,bottom=42;
  let min=Math.min(0,...rows.flatMap(row=>[row.total,row.open??row.total])),max=Math.max(0,...rows.flatMap(row=>[row.total,row.open??row.total]));
  if(min===max){min=-1;max=1}
@@ -123,10 +139,10 @@ function LiquidityChart({rows}){
   closeY:valueY(row.total),
  }));
  const gridValues=[max,(max+min)/2,min,0].filter((value,index,all)=>all.indexOf(value)===index);
- const monthLabel=value=>new Intl.DateTimeFormat('ar',{month:'short'}).format(new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,1));
+ const periodLabel=value=>daily?new Intl.DateTimeFormat('ar',{day:'numeric',month:'short'}).format(new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,Number(value.slice(8,10)))):new Intl.DateTimeFormat('ar',{month:'short'}).format(new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,1));
  const candleWidth=Math.max(10,Math.min(24,(width-padX*2)/Math.max(points.length,1)*.42));
  return <div className="liquidity-chart-wrap">
-  <svg className="liquidity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="مخطط الشموع اليابانية لتطور صافي السيولة بالدولار">
+  <svg className="liquidity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`مخطط الشموع اليابانية لتطور صافي السيولة بالدولار ${daily?'يوميًا':'شهريًا'}`}>
    {gridValues.map(value=><line key={value} x1={padX} x2={width-padX} y1={valueY(value)} y2={valueY(value)} className={value===0?'liquidity-grid-line liquidity-chart-zero':'liquidity-grid-line'}/>)}
    {points.map((point,index)=>{
     const showLabel=points.length<=8||index%2===0||index===points.length-1;
@@ -135,8 +151,8 @@ function LiquidityChart({rows}){
     const rawHeight=difference===null?0:Math.abs(point.closeY-point.openY);
     const bodyHeight=difference===null?0:Math.max(4,rawHeight);
     const bodyY=difference===null?point.closeY:Math.min(point.closeY,point.openY)-Math.max(0,(4-rawHeight)/2);
-    const title=difference===null?`${monthName(point.month)} · أول رصيد مسجل: ${signedMoney(point.total)}`:`${monthName(point.month)} · الافتتاح ${signedMoney(point.open)} · الإغلاق ${signedMoney(point.total)} · التغيّر ${signedMoney(difference)}`;
-    return <g key={point.month}><title>{title}</title>{trend==='origin'?<circle cx={point.x} cy={point.closeY} r="5" className="liquidity-candle-origin"/>:<rect x={point.x-candleWidth/2} y={bodyY} width={candleWidth} height={bodyHeight} rx="2" className={`liquidity-candle ${trend}`}/>}{showLabel&&<text x={point.x} y={height-12} textAnchor="middle" className="liquidity-chart-label"><title>{monthName(point.month)}</title>{monthLabel(point.month)}</text>}</g>
+    const title=difference===null?`${periodName(point.month)} · أول رصيد مسجل: ${signedMoney(point.total)}`:`${periodName(point.month)} · الافتتاح ${signedMoney(point.open)} · الإغلاق ${signedMoney(point.total)} · التغيّر ${signedMoney(difference)}`;
+    return <g key={point.month}><title>{title}</title>{trend==='origin'?<circle cx={point.x} cy={point.closeY} r="5" className="liquidity-candle-origin"/>:<rect x={point.x-candleWidth/2} y={bodyY} width={candleWidth} height={bodyHeight} rx="2" className={`liquidity-candle ${trend}`}/>}{showLabel&&<text x={point.x} y={height-12} textAnchor="middle" className="liquidity-chart-label"><title>{periodName(point.month)}</title>{periodLabel(point.month)}</text>}</g>
    })}
   </svg>
  </div>
@@ -156,7 +172,7 @@ function LiquidityRateSheet({draft,setDraft,onClose,onSave,busy,onAddCurrency,ne
      <Field label="وحدات لكل دولار" type="number" min="0.000001" step="any" inputMode="decimal" value={newCurrency.rate} onChange={event=>setNewCurrency(current=>({...current,rate:event.target.value}))}/>
      <Button kind="ghost" icon={Plus} onClick={onAddCurrency}>إضافة</Button>
     </div>
-    <p className="tiny">الأسعار التي تحفظها هنا لا تغيّر الأسعار الرئيسية. وكل شهر محفوظ يحتفظ بسعره كما كان عند تسجيله.</p>
+    <p className="tiny">الأسعار التي تحفظها هنا لا تغيّر الأسعار الرئيسية. وكل سجل يومي أو شهري يحتفظ بسعره كما كان عند تسجيله.</p>
    </section>
    <ErrorBox>{error}</ErrorBox>
   </div>
@@ -166,14 +182,15 @@ function LiquidityRateSheet({draft,setDraft,onClose,onSave,busy,onAddCurrency,ne
 export function LiquidityPage(){
  const {settings,liquidity=[],liquiditySettings=[],mutate,remove,online}=useApp();
  const config=liquiditySettings.find(row=>row.id==='main');
- const [configDraft,setConfigDraft]=useState(null),[month,setMonth]=useState(today().slice(0,7));
+ const [configDraft,setConfigDraft]=useState(null),[periodType,setPeriodType]=useState('monthly'),[month,setMonth]=useState(today().slice(0,7)),[day,setDay]=useState(today());
  const [entries,setEntries]=useState([newEntry()]),[showRates,setShowRates]=useState(false),[showEntry,setShowEntry]=useState(false),[detailRecord,setDetailRecord]=useState(null);
  const [recordToDelete,setRecordToDelete]=useState(null);
  const [newCurrency,setNewCurrency]=useState({code:'',name:'',symbol:'',rate:''});
  const [busy,setBusy]=useState(false),[rateBusy,setRateBusy]=useState(false),[exportBusy,setExportBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[exportError,setExportError]=useState(''),[exportNotice,setExportNotice]=useState('');
  const initialized=useRef(false);
  const amountRefs=useRef([]);
- const currentRecord=liquidity.find(row=>row.month===month);
+ const daily=periodType==='daily',period=daily?day:month;
+ const currentRecord=liquidity.find(row=>row.month===period);
 
  useEffect(()=>{
   if(config){setConfigDraft(clone(config));initialized.current=true;return}
@@ -189,17 +206,18 @@ export function LiquidityPage(){
  useEffect(()=>{
   setEntries(currentRecord?.entries?.length?clone(currentRecord.entries):[newEntry()]);
   setError('');setNotice('');
- },[month,currentRecord?.id,currentRecord?.updatedAt]);
+ },[period,currentRecord?.id,currentRecord?.updatedAt]);
 
  const currencies=configDraft?.currencies||[];
  const rates={...(configDraft?.rates||{}),...(currentRecord?.rates||{})};
  const total=monthTotal(currentRecord),draftAmount=draftTotal(entries,rates);
  const hasCurrentBalance=!!currentRecord;
- const priorMonth=monthBefore(month),priorRecord=liquidity.find(row=>row.month===priorMonth),priorTotal=monthTotal(priorRecord);
+ const priorRecord=previousRecord(liquidity,currentRecord),priorTotal=monthTotal(priorRecord);
  const change=hasCurrentBalance&&priorRecord?round(total-priorTotal):null;
  const percent=changePercent(change,priorTotal);
- const displayRows=useMemo(()=>{const snapshots=[...liquidity].sort((a,b)=>a.month.localeCompare(b.month)).map(row=>({month:row.month,total:monthTotal(row)})),start=Math.max(0,snapshots.length-12);return snapshots.slice(start).map((row,index)=>({...row,open:snapshots[start+index-1]?.total??null}))},[liquidity]);
- const firstRecord=[...liquidity].filter(row=>row.month<=month).sort((a,b)=>a.month.localeCompare(b.month))[0];
+ const displayRows=useMemo(()=>{const snapshots=liquidity.filter(row=>isDailyPeriod(row.month)===daily).sort((a,b)=>a.month.localeCompare(b.month)).map(row=>({month:row.month,total:monthTotal(row)})),start=Math.max(0,snapshots.length-(daily?30:12));return snapshots.slice(start).map((row,index)=>({...row,open:snapshots[start+index-1]?.total??null}))},[liquidity,daily]);
+ const periodRecords=liquidity.filter(row=>isDailyPeriod(row.month)===daily&&row.month<=period).sort((a,b)=>a.month.localeCompare(b.month));
+ const firstRecord=periodRecords[0];
  const sinceStart=hasCurrentBalance&&firstRecord?round(total-monthTotal(firstRecord)):null;
  const totalsByCurrency=(currentRecord?.entries||[]).reduce((result,entry)=>{
   if(Number(entry.amount)>0)result[entry.currency]=(result[entry.currency]||0)+signedAmount(entry);
@@ -213,7 +231,7 @@ export function LiquidityPage(){
  function advanceAmount(entry,index){if(index<entries.length-1){focusAmount(index+1);return}if(Number(entry.amount)>0)appendEntry(entry.currency);}
  function removeEntry(id){setEntries(current=>current.length===1?[newEntry(currencies[0]?.code||'USD')]:current.filter(entry=>entry.id!==id));}
 
- async function saveMonth(){
+ async function savePeriod(){
   setError('');setNotice('');
   if(entries.some(entry=>entry.amount!==''&&(!Number.isFinite(Number(entry.amount))||Number(entry.amount)<0))){setError('أدخل مبالغ صحيحة غير سالبة');return}
   const cleanEntries=entries.filter(entry=>Number(entry.amount)>0).map(entry=>{
@@ -227,8 +245,8 @@ export function LiquidityPage(){
   try{
    const currentConfig={id:'main',currencies,rates:Object.fromEntries(currencies.map(currency=>[currency.code,currency.code==='USD'?1:Number(configDraft?.rates?.[currency.code])]))};
    if(!config||JSON.stringify(currentConfig)!==JSON.stringify({id:'main',currencies:config.currencies,rates:config.rates}))await mutate('liquidity-settings',currentConfig,config?.id);
-   await mutate('liquidity',{id:month,month,entries:cleanEntries,rates:clone(rates)},currentRecord?.id);
-   setNotice(online?'تم حفظ سيولة الشهر.':'حُفظت السيولة على هذا الجهاز وستُزامن عند عودة الاتصال.');setShowEntry(false);
+   await mutate('liquidity',{id:period,month:period,entries:cleanEntries,rates:clone(rates)},currentRecord?.id);
+   setNotice(online?`تم حفظ سيولة ${daily?'اليوم':'الشهر'}.`:`حُفظت السيولة على هذا الجهاز وستُزامن عند عودة الشبكة.`);setShowEntry(false);
   }catch(reason){setError(reason.message)}finally{setBusy(false)}
  }
 
@@ -271,7 +289,7 @@ export function LiquidityPage(){
  async function downloadImage(record){
   setExportBusy(true);setExportError('');setExportNotice('');
   try{
-   const previous=liquidity.find(row=>row.month===monthBefore(record.month)),delta=previous?round(monthTotal(record)-monthTotal(previous)):null;
+   const previous=previousRecord(liquidity,record),delta=previous?round(monthTotal(record)-monthTotal(previous)):null;
    const percent=previous?changePercent(delta,monthTotal(previous)):null;
    downloadBlob(await liquidityImage(record,delta,percent),`السيولة-${record.month}.png`);
   }catch(reason){setExportError(reason.message)}finally{setExportBusy(false)}
@@ -280,44 +298,47 @@ export function LiquidityPage(){
  async function shareImage(record){
   setExportBusy(true);setExportError('');setExportNotice('');
   try{
-   const previous=liquidity.find(row=>row.month===monthBefore(record.month)),delta=previous?round(monthTotal(record)-monthTotal(previous)):null;
+   const previous=previousRecord(liquidity,record),delta=previous?round(monthTotal(record)-monthTotal(previous)):null;
    const percent=previous?changePercent(delta,monthTotal(previous)):null;
    const blob=await liquidityImage(record,delta,percent),filename=`السيولة-${record.month}.png`;
    const file=typeof File==='undefined'?null:new File([blob],filename,{type:'image/png'});
    if(file&&navigator.share&&navigator.canShare?.({files:[file]})){
-    await navigator.share({files:[file],title:`ملخص السيولة · ${monthName(record.month)}`,text:'ملخص السيولة الشهري'});
+    await navigator.share({files:[file],title:`ملخص السيولة · ${periodName(record.month)}`,text:`ملخص السيولة ${isDailyPeriod(record.month)?'اليومي':'الشهري'}`});
    }else{
     downloadBlob(blob,filename);setExportNotice('المشاركة المباشرة غير متاحة في هذا المتصفح؛ نزّلت الصورة لتشاركها من جهازك.');
    }
   }catch(reason){if(reason.name!=='AbortError')setExportError(reason.message)}finally{setExportBusy(false)}
  }
 
- function editRecord(record){setMonth(record.month);setDetailRecord(null);setShowEntry(true);}
+ function editRecord(record){const isDaily=isDailyPeriod(record.month);setPeriodType(isDaily?'daily':'monthly');if(isDaily)setDay(record.month);else setMonth(record.month);setDetailRecord(null);setShowEntry(true);}
 
  const percentLabel=percent===null?'—':`${percent>0?'+':''}${num(percent)}٪`;
  const history=[...liquidity].sort((a,b)=>b.month.localeCompare(a.month));
- const detailPrevious=detailRecord&&liquidity.find(row=>row.month===monthBefore(detailRecord.month));
+ const detailPrevious=detailRecord&&previousRecord(liquidity,detailRecord);
  const detailChange=detailRecord&&detailPrevious?round(monthTotal(detailRecord)-monthTotal(detailPrevious)):null;
  const detailPercent=detailChange!==null?changePercent(detailChange,monthTotal(detailPrevious)):null;
  return <div className="stack liquidity-page">
   <section className="hero liquidity-hero">
-   <div className="between items-start"><div><p className="hero-label">ملخص السيولة · {monthName(month)}</p><p className="hero-caption">رصيدك المستقل عن الديون والسحوبات.</p></div><button className="hero-icon liquidity-rate-trigger" type="button" aria-label="أسعار صرف السيولة" title="أسعار صرف السيولة" disabled={!configDraft} onClick={()=>{setError('');setShowRates(true)}}><Settings size={22}/></button></div>
-   <div className="liquidity-hero-main"><div><small>صافي الشهر المحوّل إلى الدولار</small><div className="hero-amount num">{signedMoney(total)}</div></div><div className="liquidity-hero-action"><span className="chip">{num(currentRecord?.entries?.length||0)} مبلغ مسجّل</span><Button kind="white" icon={Plus} disabled={!configDraft} onClick={()=>{setError('');setShowEntry(true)}}>إضافة</Button></div></div>
-   {Object.keys(totalsByCurrency).length>0?<div className="liquidity-currency-summary">{Object.entries(totalsByCurrency).map(([code,amount])=>{const entry=currentRecord.entries.find(item=>item.currency===code),currency=currencies.find(item=>item.code===code);return <span className="chip" key={code}>{signedMoney(amount,entry?.currencySymbol||currency?.symbol||code)} · {code}</span>})}</div>:<p className="liquidity-empty-summary">لا توجد مبالغ مسجلة لهذا الشهر بعد.</p>}
+   <div className="between items-start"><div><p className="hero-label">ملخص السيولة · {periodName(period)}</p><p className="hero-caption">رصيدك المستقل عن الديون والسحوبات.</p></div><button className="hero-icon liquidity-rate-trigger" type="button" aria-label="أسعار صرف السيولة" title="أسعار صرف السيولة" disabled={!configDraft} onClick={()=>{setError('');setShowRates(true)}}><Settings size={22}/></button></div>
+   <div className="liquidity-hero-main"><div><small>صافي {daily?'اليوم':'الشهر'} المحوّل إلى الدولار</small><div className="hero-amount num">{signedMoney(total)}</div></div><div className="liquidity-hero-action"><span className="chip">{num(currentRecord?.entries?.length||0)} مبلغ مسجّل</span><Button kind="white" icon={Plus} disabled={!configDraft} onClick={()=>{setError('');setShowEntry(true)}}>إضافة</Button></div></div>
+   {Object.keys(totalsByCurrency).length>0?<div className="liquidity-currency-summary">{Object.entries(totalsByCurrency).map(([code,amount])=>{const entry=currentRecord.entries.find(item=>item.currency===code),currency=currencies.find(item=>item.code===code);return <span className="chip" key={code}>{signedMoney(amount,entry?.currencySymbol||currency?.symbol||code)} · {code}</span>})}</div>:<p className="liquidity-empty-summary">لا توجد مبالغ مسجلة لهذا {daily?'اليوم':'الشهر'} بعد.</p>}
   </section>
-  <Field label="الشهر المعروض" type="month" value={month} onChange={event=>{if(event.target.value){setMonth(event.target.value);setNotice('')}}}/>
+  <div className="liquidity-period-control">
+   <div className="segments liquidity-period-switch" role="group" aria-label="فترة تسجيل السيولة"><button type="button" className={daily?'selected':''} aria-pressed={daily} onClick={()=>{setPeriodType('daily');setNotice('')}}>يومي</button><button type="button" className={!daily?'selected':''} aria-pressed={!daily} onClick={()=>{setPeriodType('monthly');setNotice('')}}>شهري</button></div>
+   <Field label={daily?'اليوم المعروض':'الشهر المعروض'} type={daily?'date':'month'} value={daily?day:month} onChange={event=>{if(event.target.value){if(daily)setDay(event.target.value);else setMonth(event.target.value);setNotice('')}}}/>
+  </div>
   {notice&&<div className="success">{notice}</div>}
   <section className="kpi-grid liquidity-kpis">
-   <div className="tile"><small>الفرق عن الشهر السابق</small><strong className={`num ${change===null?'':change>=0?'pay':'debt'}`}>{change===null?'—':signedMoney(change)}</strong></div>
-   <div className="tile"><small>نسبة التغيّر الشهري</small><strong className={`num ${percent===null?'':percent>=0?'pay':'debt'}`}>{percentLabel}</strong></div>
+   <div className="tile"><small>الفرق عن {daily?'آخر يوم مسجل':'الشهر السابق'}</small><strong className={`num ${change===null?'':change>=0?'pay':'debt'}`}>{change===null?'—':signedMoney(change)}</strong></div>
+   <div className="tile"><small>نسبة التغيّر {daily?'اليومي':'الشهري'}</small><strong className={`num ${percent===null?'':percent>=0?'pay':'debt'}`}>{percentLabel}</strong></div>
    <div className="tile"><small>التغيّر منذ أول تسجيل</small><strong className={`num ${sinceStart===null?'':sinceStart>=0?'pay':'debt'}`}>{sinceStart===null?'—':signedMoney(sinceStart)}</strong></div>
   </section>
-  <section className="card liquidity-chart-card"><div className="section-heading padded"><div><h2><Coins size={17}/> تطوّر صافي السيولة</h2><p className="tiny">الشمعة تقارن الرصيد بآخر سجل محفوظ: الأخضر ارتفاع والأحمر انخفاض. لا تظهر ظلال داخل الشهر لعدم تسجيل أعلى وأدنى رصيد.</p></div></div><LiquidityChart rows={displayRows}/></section>
+  <section className="card liquidity-chart-card"><div className="section-heading padded"><div><h2><Coins size={17}/> تطوّر صافي السيولة {daily?'اليومي':'الشهري'}</h2><p className="tiny">الشمعة تقارن الرصيد بآخر سجل محفوظ: الأخضر ارتفاع والأحمر انخفاض. لا تظهر ظلال داخل {daily?'اليوم':'الشهر'} لعدم تسجيل أعلى وأدنى رصيد.</p></div></div><LiquidityChart rows={displayRows} daily={daily}/></section>
   <section className="card liquidity-history-card">
-   <div className="section-heading padded"><div><h2>سجل العمليات</h2><p className="tiny">افتح سجل أي شهر لعرض المبالغ وتنزيله أو مشاركته.</p></div></div>
-   {history.length?<div className="record-list">{history.map(record=><div className="liquidity-history-item" key={record.id}><button type="button" className="record-row liquidity-history-row" onClick={()=>{setDetailRecord(record);setExportError('');setExportNotice('')}}><span className="soft-icon"><Coins size={19}/></span><div className="grow min-zero text-right"><b>سيولة {monthName(record.month)}</b><small>{num(record.entries?.length||0)} مبلغ · {record._pending?'بانتظار المزامنة':'اضغط لعرض التفاصيل'}</small></div><div className="left nowrap"><b>{signedMoney(monthTotal(record))}</b><small>الصافي بالدولار</small></div><ChevronLeft size={16}/></button><button type="button" className="icon liquidity-history-delete" aria-label={`حذف سجل سيولة ${monthName(record.month)}`} title={record._pending?'لا يمكن حذف سجل بانتظار المزامنة':!online?'الحذف يتطلب اتصالًا بالإنترنت':'حذف سجل الشهر'} disabled={!online||record._pending} onClick={()=>setRecordToDelete(record)}><Trash2 size={17}/></button></div>)}</div>:<p className="report-empty">لا توجد سجلات بعد. اضغط «إضافة» لتسجيل سيولة الشهر.</p>}
+   <div className="section-heading padded"><div><h2>سجل السيولة</h2><p className="tiny">افتح سجل أي يوم أو شهر لعرض مبالغه وتنزيله أو مشاركته.</p></div></div>
+   {history.length?<div className="record-list">{history.map(record=><div className="liquidity-history-item" key={record.id}><button type="button" className="record-row liquidity-history-row" onClick={()=>{setDetailRecord(record);setExportError('');setExportNotice('')}}><span className="soft-icon"><Coins size={19}/></span><div className="grow min-zero text-right"><b>سيولة {periodName(record.month)}</b><small>{num(record.entries?.length||0)} مبلغ · {isDailyPeriod(record.month)?'يومي':'شهري'} · {record._pending?'بانتظار المزامنة':'اضغط لعرض التفاصيل'}</small></div><div className="left nowrap"><b>{signedMoney(monthTotal(record))}</b><small>الصافي بالدولار</small></div><ChevronLeft size={16}/></button><button type="button" className="icon liquidity-history-delete" aria-label={`حذف سجل سيولة ${periodName(record.month)}`} title={record._pending?'لا يمكن حذف سجل بانتظار المزامنة':!online?'الحذف يتطلب اتصالًا بالإنترنت':`حذف سجل ${periodName(record.month)}`} disabled={!online||record._pending} onClick={()=>setRecordToDelete(record)}><Trash2 size={17}/></button></div>)}</div>:<p className="report-empty">لا توجد سجلات بعد. اضغط «إضافة» لتسجيل السيولة.</p>}
   </section>
-  {showEntry&&<Sheet title={currentRecord?'تعديل سيولة الشهر':'إضافة سيولة الشهر'} subtitle={monthName(month)} wide onClose={()=>setShowEntry(false)} footer={<><Button icon={Save} disabled={busy||!configDraft} onClick={saveMonth}>{busy?'جارٍ الحفظ…':currentRecord?'حفظ تعديل الشهر':'حفظ سيولة الشهر'}</Button><Button kind="ghost" onClick={()=>setShowEntry(false)}>إلغاء</Button></>}>
+  {showEntry&&<Sheet title={currentRecord?`تعديل سيولة ${daily?'اليوم':'الشهر'}`:`إضافة سيولة ${daily?'اليوم':'الشهر'}`} subtitle={periodName(period)} wide onClose={()=>setShowEntry(false)} footer={<><Button icon={Save} disabled={busy||!configDraft} onClick={savePeriod}>{busy?'جارٍ الحفظ…':currentRecord?`حفظ تعديل ${daily?'اليوم':'الشهر'}`:`حفظ سيولة ${daily?'اليوم':'الشهر'}`}</Button><Button kind="ghost" onClick={()=>setShowEntry(false)}>إلغاء</Button></>}>
    <div className="stack">
     <div className="liquidity-month-total"><small>صافي المبالغ بالدولار</small><strong>{signedMoney(draftAmount)}</strong></div>
     <p className="tiny">أدخل المبلغ بدون إشارة، ثم اختر هل هو لنا أم علينا. الوصف اختياري، ويمكن تكرار العملة لأكثر من حساب أو مكان. اضغط Enter أو «التالي» للانتقال إلى المبلغ التالي وإظهاره تلقائيًا.</p>
@@ -335,17 +356,17 @@ export function LiquidityPage(){
     <ErrorBox>{error}</ErrorBox>
    </div>
   </Sheet>}
-  {detailRecord&&<Sheet title="تفاصيل السيولة" subtitle={monthName(detailRecord.month)} wide onClose={()=>setDetailRecord(null)} footer={<Button kind="ghost" onClick={()=>setDetailRecord(null)}>إغلاق</Button>}>
+  {detailRecord&&<Sheet title="تفاصيل السيولة" subtitle={periodName(detailRecord.month)} wide onClose={()=>setDetailRecord(null)} footer={<Button kind="ghost" onClick={()=>setDetailRecord(null)}>إغلاق</Button>}>
    <div className="stack">
-    <div className="liquidity-detail-total"><small>صافي السيولة بالدولار</small><strong>{signedMoney(monthTotal(detailRecord))}</strong><div className="between"><span>الفرق عن الشهر السابق</span><b className={detailChange===null?'':detailChange>=0?'pay':'debt'}>{detailChange===null?'—':signedMoney(detailChange)}</b></div><div className="between"><span>نسبة التغيّر</span><b>{detailPercent===null?'—':`${detailPercent>0?'+':''}${num(detailPercent)}٪`}</b></div></div>
+    <div className="liquidity-detail-total"><small>صافي السيولة بالدولار</small><strong>{signedMoney(monthTotal(detailRecord))}</strong><div className="between"><span>الفرق عن {isDailyPeriod(detailRecord.month)?'آخر يوم مسجل':'الشهر السابق'}</span><b className={detailChange===null?'':detailChange>=0?'pay':'debt'}>{detailChange===null?'—':signedMoney(detailChange)}</b></div><div className="between"><span>نسبة التغيّر {isDailyPeriod(detailRecord.month)?'اليومي':'الشهري'}</span><b>{detailPercent===null?'—':`${detailPercent>0?'+':''}${num(detailPercent)}٪`}</b></div></div>
     <h3>المبالغ المسجلة ({detailRecord.entries?.length||0})</h3>
     <div className="liquidity-detail-list">{(detailRecord.entries||[]).map(entry=>{const rate=Number(detailRecord.rates?.[entry.currency])||1,amount=signedAmount(entry),direction=entry.direction==='owed'?'علينا (−)':'لنا (+)';return <div className="liquidity-detail-row" key={entry.id}><div className="grow min-zero"><b>{entry.description||'بدون وصف'}</b><small><span className={`liquidity-side-badge ${entry.direction==='owed'?'owed':''}`}>{direction}</span> · {entry.currencyName||entry.currency} · {entry.currency}</small><small>سعر الصرف: 1 USD = {num(rate)} {entry.currency}</small></div><div className="left nowrap"><b>{signedMoney(amount,entry.currencySymbol||entry.currency)}</b><small>≈ {signedMoney(amount/rate)}</small></div></div>})}</div>
-    <div className="liquidity-export-actions"><Button kind="ghost" icon={FileText} disabled={!online||!!detailRecord._pending||exportBusy} onClick={()=>downloadPdf(detailRecord)}>{exportBusy?'جارٍ التجهيز…':'تنزيل PDF'}</Button><Button kind="ghost" icon={ImageIcon} disabled={exportBusy} onClick={()=>downloadImage(detailRecord)}>تنزيل صورة PNG</Button><Button icon={Share2} disabled={exportBusy} onClick={()=>shareImage(detailRecord)}>مشاركة</Button><Button kind="ghost" icon={Pencil} onClick={()=>editRecord(detailRecord)}>تعديل الشهر</Button></div>
-    {(!online||detailRecord._pending)&&<p className="tiny">تنزيل PDF يتطلب اتصالًا ومزامنة سجل الشهر. يمكنك تنزيل الصورة ومشاركتها من بيانات هذا الجهاز.</p>}
+    <div className="liquidity-export-actions"><Button kind="ghost" icon={FileText} disabled={!online||!!detailRecord._pending||exportBusy} onClick={()=>downloadPdf(detailRecord)}>{exportBusy?'جارٍ التجهيز…':'تنزيل PDF'}</Button><Button kind="ghost" icon={ImageIcon} disabled={exportBusy} onClick={()=>downloadImage(detailRecord)}>تنزيل صورة PNG</Button><Button icon={Share2} disabled={exportBusy} onClick={()=>shareImage(detailRecord)}>مشاركة</Button><Button kind="ghost" icon={Pencil} onClick={()=>editRecord(detailRecord)}>تعديل {isDailyPeriod(detailRecord.month)?'اليوم':'الشهر'}</Button></div>
+    {(!online||detailRecord._pending)&&<p className="tiny">تنزيل PDF يتطلب اتصالًا ومزامنة السجل. يمكنك تنزيل الصورة ومشاركتها من بيانات هذا الجهاز.</p>}
     <ErrorBox>{exportError}</ErrorBox>{exportNotice&&<p className="tiny">{exportNotice}</p>}
    </div>
   </Sheet>}
-   {recordToDelete&&<Confirm title={`حذف سجل سيولة ${monthName(recordToDelete.month)}`} onClose={()=>setRecordToDelete(null)} onConfirm={async()=>{await remove('liquidity',recordToDelete.id);if(detailRecord?.id===recordToDelete.id)setDetailRecord(null)}}><p>سيُحذف سجل هذا الشهر وجميع مبالغه نهائيًا، وسيُعاد حساب مخطط السيولة. لا يمكن التراجع عن الحذف.</p></Confirm>}
+   {recordToDelete&&<Confirm title={`حذف سجل سيولة ${periodName(recordToDelete.month)}`} onClose={()=>setRecordToDelete(null)} onConfirm={async()=>{await remove('liquidity',recordToDelete.id);if(detailRecord?.id===recordToDelete.id)setDetailRecord(null)}}><p>سيُحذف سجل هذه الفترة وجميع مبالغه نهائيًا، وسيُعاد حساب مخطط السيولة. لا يمكن التراجع عن الحذف.</p></Confirm>}
   {showRates&&<LiquidityRateSheet draft={configDraft} setDraft={setConfigDraft} onClose={()=>setShowRates(false)} onSave={saveRates} busy={rateBusy} onAddCurrency={addCurrency} newCurrency={newCurrency} setNewCurrency={setNewCurrency} error={error}/>}
  </div>
 }

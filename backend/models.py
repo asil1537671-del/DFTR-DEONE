@@ -94,7 +94,8 @@ class LiquiditySettings(Owned, Base):
 class LiquidityMonth(Owned, Base):
     __tablename__ = 'liquidity_months'
     __table_args__ = (UniqueConstraint('user_id', 'month', name='uq_liquidity_month_user_month'),)
-    month: Mapped[str] = mapped_column(String(7))
+    # Stores YYYY-MM for a monthly snapshot or YYYY-MM-DD for a daily snapshot.
+    month: Mapped[str] = mapped_column(String(10))
     entries: Mapped[list] = mapped_column(JSON)
     rates: Mapped[dict] = mapped_column(JSON)
 

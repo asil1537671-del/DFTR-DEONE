@@ -310,3 +310,7 @@ html[data-theme="dark"] .custom-pricing-switch.enabled{color:#62d0c4}
  html[data-theme="dark"] .error{background:#3a2523;color:#ffaaa0;border-color:#f07b7050}
  html[data-theme="dark"] .sync-banner{background:#342d1d;color:#e6cc8f;border-color:#d6ad5e40}
 }
+
+.liquidity-period-control{display:grid;grid-template-columns:minmax(120px,180px) minmax(0,1fr);align-items:end;gap:12px}
+.liquidity-period-switch{min-height:42px;margin-bottom:1px}
+.liquidity-period-switch button{min-width:0}

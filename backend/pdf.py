@@ -194,6 +194,8 @@ def client_statement(settings, client, data, start, end, currency):
 
 def liquidity_report(settings, record):
     month = record['month']
+    daily = len(month) == 10
+    period_type = 'اليوم' if daily else 'الشهر'
     entries = record.get('entries') or []
     rates = record.get('rates') or {}
     total = sum(
@@ -202,8 +204,8 @@ def liquidity_report(settings, record):
         for entry in entries
     )
     currencies = {entry.get('currency') for entry in entries}
-    doc = Document(settings, 'تقرير السيولة — ' + month)
-    doc.paragraph('الشهر: ' + ltr(month) + ' · هذا التقرير مستقل عن الديون والسحوبات.')
+    doc = Document(settings, f'تقرير السيولة — {period_type} {month}')
+    doc.paragraph(('التاريخ: ' if daily else 'الشهر: ') + ltr(month) + ' · هذا التقرير مستقل عن الديون والسحوبات.')
     total_label = ('+' if total > 0 else '−' if total < 0 else '') + fmt(abs(total))
     doc.kpis([
         ('صافي السيولة بالدولار', total_label, '#0c5c50'),
@@ -228,5 +230,5 @@ def liquidity_report(settings, record):
             sign + fmt(amount / rate),
         ])
     doc.data_table(['الوصف', 'جهة المبلغ', 'العملة', 'المبلغ بإشارته', 'سعر الصرف', 'المقابل بالدولار'], rows)
-    doc.notice('تُحسب «لنا» بالموجب و«علينا» بالسالب. صافي السيولة هو مجموع المبالغ بعد التحويل بسعر الصرف المستقل المحفوظ لهذا الشهر.')
+    doc.notice(f'تُحسب «لنا» بالموجب و«علينا» بالسالب. صافي السيولة هو مجموع المبالغ بعد التحويل بسعر الصرف المستقل المحفوظ لهذا {period_type}.')
     return bytes(doc.output())

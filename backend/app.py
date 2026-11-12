@@ -392,8 +392,15 @@ def create_app(database_url=None, secret=None):
 
     @app.get('/api/liquidity/{month}/pdf')
     def liquidity_pdf(month: str, user=Depends(current), session: Session = Depends(db)):
-        if not re.fullmatch(r'\d{4}-(?:0[1-9]|1[0-2])', month):
-            raise HTTPException(422, 'اختر شهرًا صالحًا')
+        monthly = bool(re.fullmatch(r'\d{4}-(?:0[1-9]|1[0-2])', month))
+        daily = bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}', month))
+        if daily:
+            try:
+                date.fromisoformat(month)
+            except ValueError:
+                daily = False
+        if not monthly and not daily:
+            raise HTTPException(422, 'اختر يومًا أو شهرًا صالحًا')
         from .pdf import liquidity_report
         record = serialize(owned(session, LiquidityMonth, user, month))
         content = liquidity_report(serialize(config(session, user)), record)
@@ -549,8 +556,15 @@ def validate_liquidity_settings(body):
 
 def validate_liquidity_month(body):
     month = str(body.get('month', ''))
-    if not re.fullmatch(r'\d{4}-(?:0[1-9]|1[0-2])', month):
-        raise ValueError('اختر شهرًا صالحًا')
+    monthly = bool(re.fullmatch(r'\d{4}-(?:0[1-9]|1[0-2])', month))
+    daily = bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}', month))
+    if daily:
+        try:
+            date.fromisoformat(month)
+        except ValueError:
+            daily = False
+    if not monthly and not daily:
+        raise ValueError('اختر يومًا أو شهرًا صالحًا')
     if body.get('id') not in (None, '', month):
         raise ValueError('معرّف سجل السيولة يجب أن يطابق الشهر')
     entries = body.get('entries')
