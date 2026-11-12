@@ -163,7 +163,13 @@ h1{line-height:1.2}h2{font-size:17px}
 .liquidity-chart-point.up{fill:#16804a;stroke:#16804a}
 .liquidity-chart-point.down{fill:#b03428;stroke:#b03428}
 .liquidity-chart-point.flat{fill:#fff;stroke:var(--primary)}
+.liquidity-candle{stroke-width:1.5}
+.liquidity-candle.up{fill:#16804a;stroke:#16804a}
+.liquidity-candle.down{fill:#b03428;stroke:#b03428}
+.liquidity-candle.flat{fill:var(--primary);stroke:var(--primary)}
+.liquidity-candle-origin{fill:var(--primary)}
 .liquidity-chart-label{fill:var(--muted);font:16px Tajawal,Plex,sans-serif}
+.settings-credit{text-align:center;padding:6px 0 20px}
 .liquidity-note{border:1px solid #ba842832;border-radius:12px;background:#ba84280b;color:#695b42;padding:12px 14px;font-size:12px;line-height:1.8}
 .liquidity-rate-table{min-width:540px}
 .liquidity-rate-table input{width:100%}
@@ -274,6 +280,7 @@ h1{line-height:1.2}h2{font-size:17px}
  html[data-theme="dark"] .liquidity-grid-line{stroke:#e7efec18}
  html[data-theme="dark"] .liquidity-chart-zero{stroke:#55bcae8a}
  html[data-theme="dark"] .liquidity-chart-point.flat{fill:#1b2723}
+ html[data-theme="dark"] .liquidity-candle.flat,html[data-theme="dark"] .liquidity-candle-origin{fill:#55bcae;stroke:#55bcae}
  html[data-theme="dark"] .liquidity-note{background:#ba84281c;color:#ead7ad;border-color:#ba842850}
  html[data-theme="dark"] th{background:#192420;color:var(--muted)}
  html[data-theme="dark"] .success{background:#183b2a;color:#8ee0aa;border-color:#58c98650}

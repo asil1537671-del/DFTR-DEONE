@@ -113,22 +113,31 @@ async function liquidityImage(record,change,percent){
 function LiquidityChart({rows}){
  if(!rows.length)return <p className="report-empty">سجّل رصيد شهر لعرض تطوّر السيولة.</p>;
  const width=720,height=230,padX=28,top=20,bottom=42;
- let min=Math.min(0,...rows.map(row=>row.total)),max=Math.max(0,...rows.map(row=>row.total));
+ let min=Math.min(0,...rows.flatMap(row=>[row.total,row.open??row.total])),max=Math.max(0,...rows.flatMap(row=>[row.total,row.open??row.total]));
  if(min===max){min=-1;max=1}
  const plotHeight=height-top-bottom,valueY=value=>top+(max-value)/(max-min)*plotHeight;
  const points=rows.map((row,index)=>({
   ...row,
   x:rows.length===1?width/2:padX+index*(width-padX*2)/(rows.length-1),
-  y:valueY(row.total),
+  openY:row.open===null||row.open===undefined?null:valueY(row.open),
+  closeY:valueY(row.total),
  }));
  const gridValues=[max,(max+min)/2,min,0].filter((value,index,all)=>all.indexOf(value)===index);
- const trendAt=index=>index===0?'flat':points[index].total>points[index-1].total?'up':points[index].total<points[index-1].total?'down':'flat';
  const monthLabel=value=>new Intl.DateTimeFormat('ar',{month:'short'}).format(new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,1));
+ const candleWidth=Math.max(10,Math.min(24,(width-padX*2)/Math.max(points.length,1)*.42));
  return <div className="liquidity-chart-wrap">
-  <svg className="liquidity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="مخطط تطور صافي السيولة بالدولار">
+  <svg className="liquidity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="مخطط الشموع اليابانية لتطور صافي السيولة بالدولار">
    {gridValues.map(value=><line key={value} x1={padX} x2={width-padX} y1={valueY(value)} y2={valueY(value)} className={value===0?'liquidity-grid-line liquidity-chart-zero':'liquidity-grid-line'}/>)}
-   {points.slice(1).map((point,index)=><path key={`${points[index].month}-${point.month}`} d={`M ${points[index].x} ${points[index].y} L ${point.x} ${point.y}`} className={`liquidity-chart-segment ${trendAt(index+1)}`}/>)}
-   {points.map((point,index)=>{const showLabel=points.length<=8||index%2===0||index===points.length-1;return <g key={point.month}><circle cx={point.x} cy={point.y} r="5" className={`liquidity-chart-point ${trendAt(index)}`}><title>{monthName(point.month)}: {signedMoney(point.total)}</title></circle>{showLabel&&<text x={point.x} y={height-12} textAnchor="middle" className="liquidity-chart-label"><title>{monthName(point.month)}</title>{monthLabel(point.month)}</text>}</g>})}
+   {points.map((point,index)=>{
+    const showLabel=points.length<=8||index%2===0||index===points.length-1;
+    const difference=point.open===null||point.open===undefined?null:point.total-point.open;
+    const trend=difference===null?'origin':difference>0?'up':difference<0?'down':'flat';
+    const rawHeight=difference===null?0:Math.abs(point.closeY-point.openY);
+    const bodyHeight=difference===null?0:Math.max(4,rawHeight);
+    const bodyY=difference===null?point.closeY:Math.min(point.closeY,point.openY)-Math.max(0,(4-rawHeight)/2);
+    const title=difference===null?`${monthName(point.month)} · أول رصيد مسجل: ${signedMoney(point.total)}`:`${monthName(point.month)} · الافتتاح ${signedMoney(point.open)} · الإغلاق ${signedMoney(point.total)} · التغيّر ${signedMoney(difference)}`;
+    return <g key={point.month}><title>{title}</title>{trend==='origin'?<circle cx={point.x} cy={point.closeY} r="5" className="liquidity-candle-origin"/>:<rect x={point.x-candleWidth/2} y={bodyY} width={candleWidth} height={bodyHeight} rx="2" className={`liquidity-candle ${trend}`}/>}{showLabel&&<text x={point.x} y={height-12} textAnchor="middle" className="liquidity-chart-label"><title>{monthName(point.month)}</title>{monthLabel(point.month)}</text>}</g>
+   })}
   </svg>
  </div>
 }
@@ -188,7 +197,7 @@ export function LiquidityPage(){
  const priorMonth=monthBefore(month),priorRecord=liquidity.find(row=>row.month===priorMonth),priorTotal=monthTotal(priorRecord);
  const change=hasCurrentBalance&&priorRecord?round(total-priorTotal):null;
  const percent=changePercent(change,priorTotal);
- const displayRows=useMemo(()=>[...liquidity].sort((a,b)=>a.month.localeCompare(b.month)).slice(-12).map(row=>({month:row.month,total:monthTotal(row)})),[liquidity]);
+ const displayRows=useMemo(()=>{const snapshots=[...liquidity].sort((a,b)=>a.month.localeCompare(b.month)).map(row=>({month:row.month,total:monthTotal(row)})),start=Math.max(0,snapshots.length-12);return snapshots.slice(start).map((row,index)=>({...row,open:snapshots[start+index-1]?.total??null}))},[liquidity]);
  const firstRecord=[...liquidity].filter(row=>row.month<=month).sort((a,b)=>a.month.localeCompare(b.month))[0];
  const sinceStart=hasCurrentBalance&&firstRecord?round(total-monthTotal(firstRecord)):null;
  const totalsByCurrency=(currentRecord?.entries||[]).reduce((result,entry)=>{
@@ -302,7 +311,7 @@ export function LiquidityPage(){
    <div className="tile"><small>نسبة التغيّر الشهري</small><strong className={`num ${percent===null?'':percent>=0?'pay':'debt'}`}>{percentLabel}</strong></div>
    <div className="tile"><small>التغيّر منذ أول تسجيل</small><strong className={`num ${sinceStart===null?'':sinceStart>=0?'pay':'debt'}`}>{sinceStart===null?'—':signedMoney(sinceStart)}</strong></div>
   </section>
-  <section className="card liquidity-chart-card"><div className="section-heading padded"><div><h2><Coins size={17}/> تطوّر صافي السيولة</h2><p className="tiny">الصافي بالدولار حسب سعر الصرف المحفوظ لكل شهر.</p></div></div><LiquidityChart rows={displayRows}/></section>
+  <section className="card liquidity-chart-card"><div className="section-heading padded"><div><h2><Coins size={17}/> تطوّر صافي السيولة</h2><p className="tiny">الشمعة تقارن الرصيد بآخر سجل محفوظ: الأخضر ارتفاع والأحمر انخفاض. لا تظهر ظلال داخل الشهر لعدم تسجيل أعلى وأدنى رصيد.</p></div></div><LiquidityChart rows={displayRows}/></section>
   <section className="card liquidity-history-card">
    <div className="section-heading padded"><div><h2>سجل العمليات</h2><p className="tiny">افتح سجل أي شهر لعرض المبالغ وتنزيله أو مشاركته.</p></div></div>
   {history.length?<div className="record-list">{history.map(record=><button className="record-row liquidity-history-row" key={record.id} onClick={()=>{setDetailRecord(record);setExportError('');setExportNotice('')}}><span className="soft-icon"><Coins size={19}/></span><div className="grow min-zero text-right"><b>سيولة {monthName(record.month)}</b><small>{num(record.entries?.length||0)} مبلغ · {record._pending?'بانتظار المزامنة':'اضغط لعرض التفاصيل'}</small></div><div className="left nowrap"><b>{signedMoney(monthTotal(record))}</b><small>الصافي بالدولار</small></div><ChevronLeft size={16}/></button>)}</div>:<p className="report-empty">لا توجد سجلات بعد. اضغط «إضافة» لتسجيل سيولة الشهر.</p>}
