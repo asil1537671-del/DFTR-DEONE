@@ -190,3 +190,38 @@ def client_statement(settings, client, data, start, end, currency):
                    rows, statement=True, closing=fmt(data['closing'], unit))
     doc.notice('الأسعار والعمولات مثبّتة عند لحظة تسجيل كل عملية، ولا تتأثر بتغيّر أسعار الصرف لاحقًا.')
     return bytes(doc.output())
+
+
+def liquidity_report(settings, record):
+    month = record['month']
+    entries = record.get('entries') or []
+    rates = record.get('rates') or {}
+    total = sum(
+        float(entry.get('amount') or 0) / float(rates.get(entry.get('currency'), 1) or 1)
+        for entry in entries
+    )
+    currencies = {entry.get('currency') for entry in entries}
+    doc = Document(settings, 'تقرير السيولة — ' + month)
+    doc.paragraph('الشهر: ' + ltr(month) + ' · هذا التقرير مستقل عن الديون والسحوبات.')
+    doc.kpis([
+        ('إجمالي السيولة بالدولار', fmt(total), '#0c5c50'),
+        ('عدد المبالغ', str(len(entries)), '#4b5f59'),
+        ('عدد العملات', str(len(currencies)), '#4b5f59'),
+        ('العملة الأساسية', 'USD', '#4b5f59'),
+    ])
+    doc.heading('الأرصدة المسجلة')
+    rows = []
+    for entry in entries:
+        code = entry.get('currency') or 'USD'
+        rate = float(rates.get(code, 1) or 1)
+        amount = float(entry.get('amount') or 0)
+        rows.append([
+            entry.get('description') or 'بدون وصف',
+            (entry.get('currencyName') or code) + ' · ' + code,
+            fmt(amount, entry.get('currencySymbol') or code),
+            '1 USD = ' + fmt(rate, entry.get('currencySymbol') or code),
+            fmt(amount / rate),
+        ])
+    doc.data_table(['الوصف', 'العملة', 'المبلغ', 'سعر الصرف', 'المقابل بالدولار'], rows)
+    doc.notice('سعر صرف السيولة مستقل عن أسعار صرف الديون، ومحفوظ كما كان عند تسجيل هذا الشهر.')
+    return bytes(doc.output())

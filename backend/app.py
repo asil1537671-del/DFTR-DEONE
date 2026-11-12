@@ -384,6 +384,15 @@ def create_app(database_url=None, secret=None):
         content = client_statement(serialize(config(session, user)), client, data, start, end, currency)
         return Response(content, media_type='application/pdf', headers={'Content-Disposition': 'attachment; filename="statement.pdf"'})
 
+    @app.get('/api/liquidity/{month}/pdf')
+    def liquidity_pdf(month: str, user=Depends(current), session: Session = Depends(db)):
+        if not re.fullmatch(r'\d{4}-(?:0[1-9]|1[0-2])', month):
+            raise HTTPException(422, 'اختر شهرًا صالحًا')
+        from .pdf import liquidity_report
+        record = serialize(owned(session, LiquidityMonth, user, month))
+        content = liquidity_report(serialize(config(session, user)), record)
+        return Response(content, media_type='application/pdf', headers={'Content-Disposition': f'attachment; filename="liquidity-{month}.pdf"'})
+
     @app.get('/api/{collection}')
     def list_rows(collection: str, user=Depends(current), session: Session = Depends(db)):
         return rows(session, model_for(collection), user)

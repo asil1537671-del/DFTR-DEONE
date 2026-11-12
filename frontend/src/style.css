@@ -158,6 +158,33 @@ h1{line-height:1.2}h2{font-size:17px}
 .liquidity-currency-form{display:grid;grid-template-columns:1fr 1.25fr .7fr 1fr auto;gap:8px;align-items:end}
 .liquidity-currency-form .field-label{font-size:11px}
 .liquidity-add-currency>.tiny{margin-top:10px}
+.liquidity-hero{background-color:#0c9290;background-image:radial-gradient(circle at 88% 12%,#ffffff32,transparent 42%),radial-gradient(circle at 12% 92%,#b9fff044,transparent 46%),repeating-linear-gradient(45deg,#ffffff0b 0,#ffffff0b 1px,transparent 1px,transparent 14px),linear-gradient(115deg,#087976,#12aaa5)}
+.liquidity-hero .hero-label{font-size:14px;color:#fff;font-weight:700}
+.liquidity-hero .hero-caption{margin-top:6px;color:#ffffffbb}
+.liquidity-hero-main{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-top:22px}
+.liquidity-hero-main>div:first-child>small{font-size:11px;color:#ffffffc7}
+.liquidity-hero .hero-amount{font-size:clamp(34px,5vw,48px);overflow-wrap:anywhere}
+.liquidity-hero-action{display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex-shrink:0}
+.liquidity-hero .chip{background:#ffffff20;color:#fff}
+.liquidity-empty-summary{margin-top:14px;color:#ffffffcc;font-size:12px}
+.liquidity-hero .liquidity-currency-summary{margin-top:18px}
+.liquidity-hero .liquidity-currency-summary .chip{border:1px solid #ffffff28}
+.liquidity-history-card{overflow:hidden}
+.liquidity-history-row{width:100%;background:transparent;color:inherit}
+.liquidity-history-row .left b{font-family:Tajawal,Plex,sans-serif;font-size:14px}
+.liquidity-history-row>svg{color:#80948c;flex-shrink:0}
+.liquidity-detail-total{display:flex;flex-direction:column;gap:10px;border:1px solid #0b9d9826;border-radius:18px;background:linear-gradient(145deg,#e9f8f5,#f5fbf9);padding:16px}
+.liquidity-detail-total>small{font-size:11px;color:var(--muted)}
+.liquidity-detail-total>strong{font:800 30px/1.2 Tajawal,Plex,sans-serif;color:#087976}
+.liquidity-detail-total>.between{padding-top:8px;border-top:1px solid #0b9d981a;font-size:12px}
+.liquidity-detail-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.liquidity-detail-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 14px;background:#fffefa}
+.liquidity-detail-row+.liquidity-detail-row{border-top:1px solid var(--line)}
+.liquidity-detail-row b{font-size:13px}
+.liquidity-detail-row small{display:block;margin-top:4px;color:var(--muted);font-size:10px}
+.liquidity-detail-row .left{text-align:left;flex-shrink:0}
+.liquidity-export-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.liquidity-export-actions .btn{justify-content:center;min-width:0;padding-inline:10px;font-size:12px}
 @media(max-width:767px){
  .bottom-nav{grid-template-columns:repeat(6,minmax(0,1fr))}
  .bottom-nav a{font-size:9px;gap:4px}
@@ -165,6 +192,18 @@ h1{line-height:1.2}h2{font-size:17px}
  .liquidity-page{gap:14px}
  .liquidity-page .page-heading{align-items:flex-start}
  .liquidity-page .page-heading>.btn{padding:9px 10px;font-size:11px}
+ .liquidity-hero{padding:20px}
+ .liquidity-hero-main{align-items:flex-start;flex-direction:column;gap:14px;margin-top:18px}
+ .liquidity-hero-action{width:100%;flex-direction:row;align-items:center;justify-content:space-between}
+ .liquidity-hero .hero-amount{font-size:36px}
+ .liquidity-hero .liquidity-currency-summary{gap:6px}
+ .liquidity-hero .liquidity-currency-summary .chip{font-size:10px}
+ .liquidity-history-row{padding:13px 12px;gap:7px}
+ .liquidity-history-row .left b{font-size:12px}
+ .liquidity-detail-row{padding:12px 10px;gap:8px}
+ .liquidity-detail-row b{font-size:12px}
+ .liquidity-export-actions{grid-template-columns:1fr 1fr}
+ .liquidity-export-actions .btn{font-size:10.5px;padding-inline:6px;gap:5px}
  .liquidity-entry-card{padding:14px}
  .liquidity-entry-head{grid-template-columns:1fr}
  .liquidity-entry-labels{display:none}
