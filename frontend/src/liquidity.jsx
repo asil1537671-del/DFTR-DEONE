@@ -19,6 +19,11 @@ function monthName(value){
  return new Intl.DateTimeFormat('ar',{month:'short',year:'numeric'}).format(new Date(year,month-1,1));
 }
 
+function currencyMark(currency){
+ const marks={USD:'🇺🇸 $',SAR:'🇸🇦 ر.س',YER:'🇾🇪 ر.ي',USDT:'₮'};
+ return marks[currency.code]||currency.symbol||currency.code;
+}
+
 function signedAmount(entry){
  const amount=Number(entry.amount)||0;
  return entry.direction==='owed'?-amount:amount;
@@ -116,13 +121,14 @@ function LiquidityChart({rows}){
   x:rows.length===1?width/2:padX+index*(width-padX*2)/(rows.length-1),
   y:valueY(row.total),
  }));
- const line=points.map((point,index)=>`${index?'L':'M'} ${point.x} ${point.y}`).join(' ');
  const gridValues=[max,(max+min)/2,min,0].filter((value,index,all)=>all.indexOf(value)===index);
+ const trendAt=index=>index===0?'flat':points[index].total>points[index-1].total?'up':points[index].total<points[index-1].total?'down':'flat';
+ const monthLabel=value=>new Intl.DateTimeFormat('ar',{month:'short'}).format(new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,1));
  return <div className="liquidity-chart-wrap">
   <svg className="liquidity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="مخطط تطور صافي السيولة بالدولار">
    {gridValues.map(value=><line key={value} x1={padX} x2={width-padX} y1={valueY(value)} y2={valueY(value)} className={value===0?'liquidity-grid-line liquidity-chart-zero':'liquidity-grid-line'}/>)}
-   {points.length>1&&<path d={line} className="liquidity-chart-line"/>}
-   {points.map(point=><g key={point.month}><circle cx={point.x} cy={point.y} r="5" className="liquidity-chart-point"><title>{monthName(point.month)}: {signedMoney(point.total)}</title></circle><text x={point.x} y={height-12} textAnchor="middle" className="liquidity-chart-label">{monthName(point.month)}</text></g>)}
+   {points.slice(1).map((point,index)=><path key={`${points[index].month}-${point.month}`} d={`M ${points[index].x} ${points[index].y} L ${point.x} ${point.y}`} className={`liquidity-chart-segment ${trendAt(index+1)}`}/>)}
+   {points.map((point,index)=>{const showLabel=points.length<=8||index%2===0||index===points.length-1;return <g key={point.month}><circle cx={point.x} cy={point.y} r="5" className={`liquidity-chart-point ${trendAt(index)}`}><title>{monthName(point.month)}: {signedMoney(point.total)}</title></circle>{showLabel&&<text x={point.x} y={height-12} textAnchor="middle" className="liquidity-chart-label"><title>{monthName(point.month)}</title>{monthLabel(point.month)}</text>}</g>})}
   </svg>
  </div>
 }
@@ -302,11 +308,11 @@ export function LiquidityPage(){
     <div className="liquidity-month-total"><small>صافي المبالغ بالدولار</small><strong>{signedMoney(draftAmount)}</strong></div>
     <p className="tiny">أدخل المبلغ بدون إشارة، ثم اختر هل هو لنا أم علينا. الوصف اختياري، ويمكن تكرار العملة لأكثر من حساب أو مكان.</p>
     <div className="liquidity-entry-list">
-     <div className="liquidity-entry-labels"><span>العملة</span><span>المبلغ الموجود</span><span>جهة المبلغ</span><span>وصف الرصيد (اختياري)</span><span/></div>
+     <div className="liquidity-entry-labels"><span>المبلغ الموجود</span><span>العملة</span><span/><span>وصف الرصيد (اختياري)</span><span/></div>
      {entries.map(entry=><div className="liquidity-entry" key={entry.id}>
-      <Field label="العملة"><select className="field" value={entry.currency} onChange={event=>updateEntry(entry.id,'currency',event.target.value)}>{currencies.map(currency=><option key={currency.code} value={currency.code}>{currency.code} — {currency.name}</option>)}</select></Field>
       <Field label="المبلغ الموجود" type="number" min="0" step="any" inputMode="decimal" placeholder="0" value={entry.amount} onChange={event=>updateEntry(entry.id,'amount',event.target.value)}/>
-      <div className="liquidity-direction-field"><span>جهة المبلغ</span><div className="liquidity-entry-direction" role="group" aria-label="جهة المبلغ"><button type="button" className={`liquidity-direction-option ${entry.direction!=='owed'?'selected':''}`} aria-pressed={entry.direction!=='owed'} onClick={()=>updateEntry(entry.id,'direction','ours')}>لنا (+)</button><button type="button" className={`liquidity-direction-option ${entry.direction==='owed'?'selected owed':''}`} aria-pressed={entry.direction==='owed'} onClick={()=>updateEntry(entry.id,'direction','owed')}>علينا (−)</button></div></div>
+      <Field label="العملة"><select className="field liquidity-currency-select" value={entry.currency} aria-label={`العملة ${currencies.find(currency=>currency.code===entry.currency)?.name||entry.currency}`} title={currencies.find(currency=>currency.code===entry.currency)?.name||entry.currency} onChange={event=>updateEntry(entry.id,'currency',event.target.value)}>{currencies.map(currency=><option key={currency.code} value={currency.code}>{currencyMark(currency)}</option>)}</select></Field>
+      <div className="liquidity-entry-direction" role="group" aria-label="جهة المبلغ"><button type="button" className={`liquidity-direction-option ${entry.direction!=='owed'?'selected':''}`} aria-pressed={entry.direction!=='owed'} onClick={()=>updateEntry(entry.id,'direction','ours')}>لنا (+)</button><button type="button" className={`liquidity-direction-option ${entry.direction==='owed'?'selected owed':''}`} aria-pressed={entry.direction==='owed'} onClick={()=>updateEntry(entry.id,'direction','owed')}>علينا (−)</button></div>
       <Field label="وصف الرصيد (اختياري)" value={entry.description} placeholder="جيب كريمي، حساب البنك…" onChange={event=>updateEntry(entry.id,'description',event.target.value)}/>
       <button className="icon liquidity-remove" aria-label="حذف المبلغ" onClick={()=>removeEntry(entry.id)}><Trash2 size={16}/></button>
      </div>)}
