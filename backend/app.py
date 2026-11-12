@@ -205,7 +205,7 @@ def create_app(database_url=None, secret=None):
         session.commit()
         return serialize(row)
 
-    def prepare(collection, body, session, user):
+    def prepare(collection, body, session, user, enforce_client_rate=False):
         if collection == 'liquidity-settings':
             return validate_liquidity_settings(body)
         if collection == 'liquidity':
@@ -236,10 +236,15 @@ def create_app(database_url=None, secret=None):
         kind = body.get('type', 'debt')
         if kind not in ['debt', 'payment']:
             raise ValueError('نوع العملية غير صالح')
-        rate = number(body.get('exchangeRate'), exchange_rate(settings, client, kind, currency))
+        client_rate = number(client.get('rates', {}).get(kind, {}).get(currency))
+        rate = (
+            client_rate
+            if enforce_client_rate and client_rate > 0
+            else number(body.get('exchangeRate'), exchange_rate(settings, client, kind, currency))
+        )
         if rate <= 0:
             raise ValueError('سعر الصرف يجب أن يكون أكبر من صفر')
-        commission_type = body.get('commissionType', 'auto')
+        commission_type = 'auto' if body.get('commissionMode') == 'auto' else body.get('commissionType', 'auto')
         commission = automatic_commission(settings, client, kind, currency, body.get('amount'), rate) if commission_type == 'auto' else {'commissionType': commission_type, 'commissionValue': body.get('commissionValue', 0)}
         return {**common, 'clientId': client_id, 'type': kind, **calculate(kind, body.get('amount'), currency, rate, commission['commissionType'], commission['commissionValue'])}
 
@@ -408,7 +413,7 @@ def create_app(database_url=None, secret=None):
         existing = session.get(model, (user.id, row_id))
         if existing:
             return serialize(existing)
-        clean = prepare(collection, body, session, user)
+        clean = prepare(collection, body, session, user, enforce_client_rate=collection == 'records')
         row = model(user_id=user.id, id=row_id, **mapped(model, clean))
         session.add(row)
         session.commit()

@@ -20,10 +20,10 @@ def test_currency_and_client_override():
         assert automatic_commission(DEFAULTS, client, 'payment', code, 20, 1)['commissionType'] == 'none'
 
 
-def test_legacy_fixed_fallback_and_manual_commission():
+def test_zero_commission_and_manual_commission():
     settings = deepcopy(DEFAULTS)
     settings['commissions']['debt'].update(smallUsd=0, percent=0, byCurrency={'USDT': 0})
-    assert automatic_commission(settings, {}, 'debt', 'USDT', 50, 1) == {'commissionType': 'fixed-add', 'commissionValue': 1}
+    assert automatic_commission(settings, {}, 'debt', 'USDT', 50, 1) == {'commissionType': 'none', 'commissionValue': 0}
     assert calculate('payment', 100, 'SAR', 4, 'percent-deduct', 2)['usdEquivalent'] == 24.5
     assert calculate('debt', 1.005, 'USD', 1, 'none', 0)['amount'] == 1.01
 

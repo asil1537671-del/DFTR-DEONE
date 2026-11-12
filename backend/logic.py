@@ -54,13 +54,14 @@ def automatic_commission(settings, client, kind, currency, amount, rate):
     if currency not in rule['currencies']:
         return {'commissionType': 'none', 'commissionValue': 0}
     usd = number(amount) / rate
-    if 0 < usd < number(rule['threshold']) and number(rule['smallUsd']) > 0:
-        return {'commissionType': f'fixed-{direction}', 'commissionValue': rounded(number(rule['smallUsd']) * rate, 4)}
+    if 0 < usd < number(rule['threshold']):
+        small_usd = number(rule['smallUsd'])
+        if small_usd <= 0:
+            return {'commissionType': 'none', 'commissionValue': 0}
+        return {'commissionType': f'fixed-{direction}', 'commissionValue': rounded(small_usd * rate, 4)}
     percent = number(rule.get('byCurrency', {}).get(currency), number(rule['percent']))
     if percent > 0:
         return {'commissionType': f'percent-{direction}', 'commissionValue': rounded(percent, 4)}
-    if number(rule['fixed']) > 0:
-        return {'commissionType': f'fixed-{direction}', 'commissionValue': rounded(rule['fixed'], 4)}
     return {'commissionType': 'none', 'commissionValue': 0}
 
 
