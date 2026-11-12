@@ -197,14 +197,16 @@ def liquidity_report(settings, record):
     entries = record.get('entries') or []
     rates = record.get('rates') or {}
     total = sum(
-        float(entry.get('amount') or 0) / float(rates.get(entry.get('currency'), 1) or 1)
+        (-1 if entry.get('direction') == 'owed' else 1)
+        * float(entry.get('amount') or 0) / float(rates.get(entry.get('currency'), 1) or 1)
         for entry in entries
     )
     currencies = {entry.get('currency') for entry in entries}
     doc = Document(settings, 'تقرير السيولة — ' + month)
     doc.paragraph('الشهر: ' + ltr(month) + ' · هذا التقرير مستقل عن الديون والسحوبات.')
+    total_label = ('+' if total > 0 else '−' if total < 0 else '') + fmt(abs(total))
     doc.kpis([
-        ('إجمالي السيولة بالدولار', fmt(total), '#0c5c50'),
+        ('صافي السيولة بالدولار', total_label, '#0c5c50'),
         ('عدد المبالغ', str(len(entries)), '#4b5f59'),
         ('عدد العملات', str(len(currencies)), '#4b5f59'),
         ('العملة الأساسية', 'USD', '#4b5f59'),
@@ -215,13 +217,16 @@ def liquidity_report(settings, record):
         code = entry.get('currency') or 'USD'
         rate = float(rates.get(code, 1) or 1)
         amount = float(entry.get('amount') or 0)
+        owed = entry.get('direction') == 'owed'
+        sign = '−' if owed else '+'
         rows.append([
             entry.get('description') or 'بدون وصف',
+            'علينا (−)' if owed else 'لنا (+)',
             (entry.get('currencyName') or code) + ' · ' + code,
-            fmt(amount, entry.get('currencySymbol') or code),
+            sign + fmt(amount, entry.get('currencySymbol') or code),
             '1 USD = ' + fmt(rate, entry.get('currencySymbol') or code),
-            fmt(amount / rate),
+            sign + fmt(amount / rate),
         ])
-    doc.data_table(['الوصف', 'العملة', 'المبلغ', 'سعر الصرف', 'المقابل بالدولار'], rows)
-    doc.notice('سعر صرف السيولة مستقل عن أسعار صرف الديون، ومحفوظ كما كان عند تسجيل هذا الشهر.')
+    doc.data_table(['الوصف', 'جهة المبلغ', 'العملة', 'المبلغ بإشارته', 'سعر الصرف', 'المقابل بالدولار'], rows)
+    doc.notice('تُحسب «لنا» بالموجب و«علينا» بالسالب. صافي السيولة هو مجموع المبالغ بعد التحويل بسعر الصرف المستقل المحفوظ لهذا الشهر.')
     return bytes(doc.output())

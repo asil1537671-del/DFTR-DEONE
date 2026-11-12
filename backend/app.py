@@ -583,5 +583,6 @@ def validate_liquidity_month(body):
             'currencyName': str(item.get('currencyName') or code).strip()[:100],
             'currencySymbol': str(item.get('currencySymbol') or code).strip()[:20],
             'amount': amount,
+            'direction': 'owed' if item.get('direction') == 'owed' else 'ours',
         })
     return {'month': month, 'entries': clean_entries, 'rates': rates}

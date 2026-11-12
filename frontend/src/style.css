@@ -132,10 +132,15 @@ h1{line-height:1.2}h2{font-size:17px}
 .liquidity-month-total small{font-size:11px}
 .liquidity-month-total strong{font:700 25px/1.3 Tajawal,Plex,sans-serif;color:var(--primary)}
 .liquidity-entry-list{display:flex;flex-direction:column;gap:10px;margin-top:20px}
-.liquidity-entry-labels,.liquidity-entry{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1fr) minmax(0,1.4fr) 40px;gap:10px;align-items:end}
+.liquidity-entry-labels,.liquidity-entry{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,.95fr) minmax(120px,1.1fr) minmax(0,1.4fr) 40px;gap:10px;align-items:end}
 .liquidity-entry-labels{color:var(--muted);font-size:11px;padding:0 12px}
 .liquidity-entry{border:1px solid var(--line);border-radius:14px;background:#fffefa;padding:12px}
 .liquidity-entry .field-label{font-size:11px}
+.liquidity-direction-field{display:flex;flex-direction:column;gap:6px;min-width:0;color:var(--muted);font-size:11px}
+.liquidity-entry-direction{display:flex;gap:3px;min-height:42px;padding:3px;border:1px solid var(--line);border-radius:12px;background:#10201c05}
+.liquidity-direction-option{flex:1;min-width:0;padding:6px 4px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:11px;font-weight:600;white-space:nowrap}
+.liquidity-direction-option.selected{background:white;color:var(--primary);box-shadow:0 1px 4px #10201c15}
+.liquidity-direction-option.selected.owed{background:#fff0ef;color:var(--debt)}
 .liquidity-remove{width:38px;height:42px;color:var(--debt)}
 .liquidity-entry-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
 .liquidity-currency-summary{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
@@ -148,6 +153,7 @@ h1{line-height:1.2}h2{font-size:17px}
 .liquidity-chart{display:block;width:100%;min-width:520px;height:auto;overflow:visible}
 .liquidity-grid-line{stroke:#10201c12;stroke-width:1}
 .liquidity-chart-line{fill:none;stroke:var(--primary);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.liquidity-chart-zero{stroke:#0c5c5080;stroke-width:1.5;stroke-dasharray:4 4}
 .liquidity-chart-point{fill:#fff;stroke:var(--primary);stroke-width:3}
 .liquidity-chart-label{fill:var(--muted);font:12px Tajawal,Plex,sans-serif}
 .liquidity-note{border:1px solid #ba842832;border-radius:12px;background:#ba84280b;color:#695b42;padding:12px 14px;font-size:12px;line-height:1.8}
@@ -185,6 +191,8 @@ h1{line-height:1.2}h2{font-size:17px}
 .liquidity-detail-row+.liquidity-detail-row{border-top:1px solid var(--line)}
 .liquidity-detail-row b{font-size:13px}
 .liquidity-detail-row small{display:block;margin-top:4px;color:var(--muted);font-size:10px}
+.liquidity-side-badge{display:inline-flex!important;margin:0!important;border-radius:999px;padding:1px 6px;background:#0c5c5010;color:var(--primary);font-weight:600}
+.liquidity-side-badge.owed{background:#b0342810;color:var(--debt)}
 .liquidity-detail-row .left{text-align:left;flex-shrink:0}
 .liquidity-export-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .liquidity-export-actions .btn{justify-content:center;min-width:0;padding-inline:10px;font-size:12px}
@@ -208,10 +216,11 @@ h1{line-height:1.2}h2{font-size:17px}
  .liquidity-entry-card{padding:14px}
  .liquidity-entry-head{grid-template-columns:1fr}
  .liquidity-entry-labels{display:none}
- .liquidity-entry{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 38px;grid-template-areas:"currency amount remove" "description description description";gap:8px}
+ .liquidity-entry{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 38px;grid-template-areas:"currency amount remove" "direction direction direction" "description description description";gap:8px}
  .liquidity-entry>.field-label:nth-child(1){grid-area:currency}
  .liquidity-entry>.field-label:nth-child(2){grid-area:amount}
- .liquidity-entry>.field-label:nth-child(3){grid-area:description}
+ .liquidity-entry>.liquidity-direction-field{grid-area:direction}
+ .liquidity-entry>.field-label:nth-child(4){grid-area:description}
  .liquidity-entry>.liquidity-remove{grid-area:remove}
  .liquidity-entry-actions{display:grid;grid-template-columns:1fr}
  .liquidity-entry-actions>.btn{width:100%}
