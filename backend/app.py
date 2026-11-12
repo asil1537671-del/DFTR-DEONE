@@ -21,18 +21,18 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 if __package__:
-    from .models import Base, User, Client, Record, Withdrawal, Settings, LegacyArchive, serialize, camel
+    from .models import Base, User, Client, Record, Withdrawal, Settings, LiquiditySettings, LiquidityMonth, LegacyArchive, serialize, camel
     from .logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded
     from .database import initialize_database, make_engine
 else:
-    from models import Base, User, Client, Record, Withdrawal, Settings, LegacyArchive, serialize, camel
+    from models import Base, User, Client, Record, Withdrawal, Settings, LiquiditySettings, LiquidityMonth, LegacyArchive, serialize, camel
     from logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded
     from database import initialize_database, make_engine
 
 MODULE_ROOT = Path(__file__).resolve().parent
 ROOT = MODULE_ROOT.parent if (MODULE_ROOT.parent / 'frontend').is_dir() else MODULE_ROOT
 load_dotenv(ROOT / '.env')
-COLLECTIONS = {'clients': Client, 'records': Record, 'withdrawals': Withdrawal}
+COLLECTIONS = {'clients': Client, 'records': Record, 'withdrawals': Withdrawal, 'liquidity': LiquidityMonth, 'liquidity-settings': LiquiditySettings}
 
 
 def create_app(database_url=None, secret=None):
@@ -206,6 +206,10 @@ def create_app(database_url=None, secret=None):
         return serialize(row)
 
     def prepare(collection, body, session, user):
+        if collection == 'liquidity-settings':
+            return validate_liquidity_settings(body)
+        if collection == 'liquidity':
+            return validate_liquidity_month(body)
         settings = serialize(config(session, user))
         codes = [c['code'] for c in settings['currencies']]
         currency = str(body.get('currency', 'USD')).upper()
@@ -350,7 +354,7 @@ def create_app(database_url=None, secret=None):
                     Client.id.in_(record_client_ids[offset:offset + 500]),
                 )).all()
 
-            for coll in ('records', 'withdrawals'):
+            for coll in ('records', 'withdrawals', 'liquidity-settings', 'liquidity'):
                 model = COLLECTIONS[coll]
                 rows_to_add = []
                 for row_id, item in pending[coll]:
@@ -493,3 +497,82 @@ def validate_settings(body):
     data['shopName'] = str(data.get('shopName', 'دفتري'))[:200]
     data['shopPhone'] = str(data.get('shopPhone', ''))[:50]
     return data
+
+
+def validate_liquidity_settings(body):
+    currencies = body.get('currencies')
+    if not isinstance(currencies, list) or not currencies or len(currencies) > 40:
+        raise ValueError('أضف عملة واحدة على الأقل')
+    clean_currencies = []
+    seen = set()
+    for item in currencies:
+        if not isinstance(item, dict):
+            raise ValueError('بيانات العملة غير صالحة')
+        code = str(item.get('code', '')).strip().upper()
+        if not re.fullmatch(r'[A-Z0-9]{2,12}', code) or code in seen:
+            raise ValueError('رمز العملة غير صالح أو مكرّر')
+        seen.add(code)
+        clean_currencies.append({
+            'code': code,
+            'name': str(item.get('name') or code).strip()[:100],
+            'symbol': str(item.get('symbol') or code).strip()[:20],
+        })
+    if 'USD' not in seen:
+        raise ValueError('عملة USD مطلوبة كأساس للمقارنة')
+    source_rates = body.get('rates')
+    if not isinstance(source_rates, dict):
+        raise ValueError('أسعار صرف السيولة غير صالحة')
+    rates = {}
+    for currency in clean_currencies:
+        code = currency['code']
+        value = 1 if code == 'USD' else number(source_rates.get(code))
+        if value <= 0:
+            raise ValueError(f'أدخل سعر صرف صحيحًا لعملة {code}')
+        rates[code] = value
+    return {'currencies': clean_currencies, 'rates': rates}
+
+
+def validate_liquidity_month(body):
+    month = str(body.get('month', ''))
+    if not re.fullmatch(r'\d{4}-(?:0[1-9]|1[0-2])', month):
+        raise ValueError('اختر شهرًا صالحًا')
+    if body.get('id') not in (None, '', month):
+        raise ValueError('معرّف سجل السيولة يجب أن يطابق الشهر')
+    entries = body.get('entries')
+    if not isinstance(entries, list) or not entries or len(entries) > 500:
+        raise ValueError('أضف مبلغًا واحدًا على الأقل')
+    source_rates = body.get('rates')
+    if not isinstance(source_rates, dict):
+        raise ValueError('أسعار صرف الشهر غير صالحة')
+    rates = {}
+    for code, value in source_rates.items():
+        code = str(code).strip().upper()
+        if not re.fullmatch(r'[A-Z0-9]{2,12}', code):
+            raise ValueError('رمز عملة غير صالح في أسعار الشهر')
+        rate = 1 if code == 'USD' else number(value)
+        if rate <= 0:
+            raise ValueError(f'سعر صرف {code} يجب أن يكون أكبر من صفر')
+        rates[code] = rate
+    if 'USD' not in rates:
+        rates['USD'] = 1
+    clean_entries = []
+    for item in entries:
+        if not isinstance(item, dict):
+            raise ValueError('بيانات المبلغ غير صالحة')
+        code = str(item.get('currency', '')).strip().upper()
+        if not re.fullmatch(r'[A-Z0-9]{2,12}', code):
+            raise ValueError('اختر عملة صالحة لكل مبلغ')
+        if number(rates.get(code)) <= 0:
+            raise ValueError(f'أدخل سعر صرف صحيحًا لعملة {code}')
+        amount = number(item.get('amount'))
+        if amount < 0:
+            raise ValueError('المبلغ لا يمكن أن يكون سالبًا')
+        clean_entries.append({
+            'id': valid_id(str(item.get('id') or uuid4())),
+            'description': str(item.get('description') or '').strip()[:120],
+            'currency': code,
+            'currencyName': str(item.get('currencyName') or code).strip()[:100],
+            'currencySymbol': str(item.get('currencySymbol') or code).strip()[:20],
+            'amount': amount,
+        })
+    return {'month': month, 'entries': clean_entries, 'rates': rates}

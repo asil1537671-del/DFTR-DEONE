@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import String, ForeignKey, ForeignKeyConstraint, JSON, DateTime, Boolean, Float, Integer
+from sqlalchemy import String, ForeignKey, ForeignKeyConstraint, UniqueConstraint, JSON, DateTime, Boolean, Float, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -83,6 +83,20 @@ class Settings(Owned, Base):
     currencies: Mapped[list] = mapped_column(JSON)
     rates: Mapped[dict] = mapped_column(JSON)
     commissions: Mapped[dict] = mapped_column(JSON)
+
+
+class LiquiditySettings(Owned, Base):
+    __tablename__ = 'liquidity_settings'
+    currencies: Mapped[list] = mapped_column(JSON)
+    rates: Mapped[dict] = mapped_column(JSON)
+
+
+class LiquidityMonth(Owned, Base):
+    __tablename__ = 'liquidity_months'
+    __table_args__ = (UniqueConstraint('user_id', 'month', name='uq_liquidity_month_user_month'),)
+    month: Mapped[str] = mapped_column(String(7))
+    entries: Mapped[list] = mapped_column(JSON)
+    rates: Mapped[dict] = mapped_column(JSON)
 
 
 class LegacyArchive(Base):
