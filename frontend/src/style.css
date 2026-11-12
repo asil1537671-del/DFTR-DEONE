@@ -161,6 +161,9 @@ h1{line-height:1.2}h2{font-size:17px}
 .liquidity-hero{background-color:#0c9290;background-image:radial-gradient(circle at 88% 12%,#ffffff32,transparent 42%),radial-gradient(circle at 12% 92%,#b9fff044,transparent 46%),repeating-linear-gradient(45deg,#ffffff0b 0,#ffffff0b 1px,transparent 1px,transparent 14px),linear-gradient(115deg,#087976,#12aaa5)}
 .liquidity-hero .hero-label{font-size:14px;color:#fff;font-weight:700}
 .liquidity-hero .hero-caption{margin-top:6px;color:#ffffffbb}
+.liquidity-rate-trigger{padding:0;color:#fff;cursor:pointer;transition:background .15s,transform .1s}
+.liquidity-rate-trigger:hover{background:#ffffff18}
+.liquidity-rate-trigger:active{transform:scale(.96)}
 .liquidity-hero-main{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-top:22px}
 .liquidity-hero-main>div:first-child>small{font-size:11px;color:#ffffffc7}
 .liquidity-hero .hero-amount{font-size:clamp(34px,5vw,48px);overflow-wrap:anywhere}
@@ -190,8 +193,6 @@ h1{line-height:1.2}h2{font-size:17px}
  .bottom-nav a{font-size:9px;gap:4px}
  .bottom-nav a>span{width:44px}
  .liquidity-page{gap:14px}
- .liquidity-page .page-heading{align-items:flex-start}
- .liquidity-page .page-heading>.btn{padding:9px 10px;font-size:11px}
  .liquidity-hero{padding:20px}
  .liquidity-hero-main{align-items:flex-start;flex-direction:column;gap:14px;margin-top:18px}
  .liquidity-hero-action{width:100%;flex-direction:row;align-items:center;justify-content:space-between}
@@ -223,6 +224,4 @@ h1{line-height:1.2}h2{font-size:17px}
 @media(max-width:390px){
  .bottom-nav a{font-size:8px}
  .bottom-nav a>span{width:40px}
- .liquidity-page .page-heading{flex-direction:column}
- .liquidity-page .page-heading>.btn{align-self:flex-start}
 }

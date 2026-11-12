@@ -263,16 +263,12 @@ export function LiquidityPage(){
  const detailChange=detailRecord&&detailPrevious?round(monthTotal(detailRecord)-monthTotal(detailPrevious)):null;
  const detailPercent=detailChange!==null&&monthTotal(detailPrevious)>0?round(detailChange/monthTotal(detailPrevious)*100,2):null;
  return <div className="stack liquidity-page">
-  <div className="page-heading">
-   <div><h1>السيولة</h1><p>سجّل الأرصدة الموجودة معك حسب العملة والمكان، وتابع تغيّرها كل شهر.</p></div>
-   <Button kind="ghost" icon={Settings} disabled={!configDraft} onClick={()=>{setError('');setShowRates(true)}}>أسعار صرف السيولة</Button>
-  </div>
-  <Field label="الشهر المعروض" type="month" value={month} onChange={event=>{if(event.target.value){setMonth(event.target.value);setNotice('')}}}/>
   <section className="hero liquidity-hero">
-   <div className="between items-start"><div><p className="hero-label">ملخص السيولة · {monthName(month)}</p><p className="hero-caption">رصيدك المستقل عن الديون والسحوبات.</p></div><span className="hero-icon"><Coins size={23}/></span></div>
+   <div className="between items-start"><div><p className="hero-label">ملخص السيولة · {monthName(month)}</p><p className="hero-caption">رصيدك المستقل عن الديون والسحوبات.</p></div><button className="hero-icon liquidity-rate-trigger" type="button" aria-label="أسعار صرف السيولة" title="أسعار صرف السيولة" disabled={!configDraft} onClick={()=>{setError('');setShowRates(true)}}><Settings size={22}/></button></div>
    <div className="liquidity-hero-main"><div><small>إجمالي الشهر المحوّل إلى الدولار</small><div className="hero-amount num">{money(total)}</div></div><div className="liquidity-hero-action"><span className="chip">{num(currentRecord?.entries?.length||0)} مبلغ مسجّل</span><Button kind="white" icon={Plus} disabled={!configDraft} onClick={()=>{setError('');setShowEntry(true)}}>إضافة</Button></div></div>
    {Object.keys(totalsByCurrency).length>0?<div className="liquidity-currency-summary">{Object.entries(totalsByCurrency).map(([code,amount])=>{const entry=currentRecord.entries.find(item=>item.currency===code),currency=currencies.find(item=>item.code===code);return <span className="chip" key={code}>{num(amount)} {entry?.currencySymbol||currency?.symbol||code} · {code}</span>})}</div>:<p className="liquidity-empty-summary">لا توجد مبالغ مسجلة لهذا الشهر بعد.</p>}
   </section>
+  <Field label="الشهر المعروض" type="month" value={month} onChange={event=>{if(event.target.value){setMonth(event.target.value);setNotice('')}}}/>
   {notice&&<div className="success">{notice}</div>}
   <section className="kpi-grid liquidity-kpis">
    <div className="tile"><small>الفرق عن الشهر السابق</small><strong className={`num ${change===null?'':change>=0?'pay':'debt'}`}>{change===null?'—':money(change)}</strong></div>
