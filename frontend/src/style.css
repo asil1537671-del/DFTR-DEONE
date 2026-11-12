@@ -264,6 +264,9 @@ h1{line-height:1.2}h2{font-size:17px}
  html[data-theme="dark"] .liquidity-direction-option.selected.owed{background:#512c2a;color:#ffb0a8}
  html[data-theme="dark"] .liquidity-detail-total{background:linear-gradient(145deg,#1b3935,#21332e);border-color:#55bcae40}
  html[data-theme="dark"] .liquidity-detail-total>strong{color:#62d0c4}
+ html[data-theme="dark"] .liquidity-grid-line{stroke:#e7efec18}
+ html[data-theme="dark"] .liquidity-chart-zero{stroke:#55bcae8a}
+ html[data-theme="dark"] .liquidity-chart-point.flat{fill:#1b2723}
  html[data-theme="dark"] .liquidity-note{background:#ba84281c;color:#ead7ad;border-color:#ba842850}
  html[data-theme="dark"] th{background:#192420;color:var(--muted)}
  html[data-theme="dark"] .success{background:#183b2a;color:#8ee0aa;border-color:#58c98650}
