@@ -243,3 +243,30 @@ h1{line-height:1.2}h2{font-size:17px}
  .bottom-nav a{font-size:8px}
  .bottom-nav a>span{width:40px}
 }
+
+.appearance-setting{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px}
+.appearance-setting h2{font-size:16px}
+@media(max-width:390px){.appearance-setting{align-items:stretch;flex-direction:column}.appearance-setting .btn{width:100%}}
+
+@media screen{
+ html[data-theme="dark"]{color-scheme:dark;color:#e7efec;background:#111916;--primary:#55bcae;--muted:#a6b6b0;--line:rgba(220,239,233,.13);--paper:#1b2723;--debt:#f07b70;--pay:#58c986;--gold:#d6ad5e}
+ html[data-theme="dark"] body,html[data-theme="dark"] .app-shell,html[data-theme="dark"] .app-column,html[data-theme="dark"] main{background:#111916;color:#e7efec}
+ html[data-theme="dark"] .sidebar,html[data-theme="dark"] .mobile-header,html[data-theme="dark"] .bottom-nav{background:#18231f;border-color:var(--line)}
+ html[data-theme="dark"] .sidebar-account,html[data-theme="dark"] .mobile-header .icon{background:#ffffff0b}
+ html[data-theme="dark"] .card,html[data-theme="dark"] .sheet{background:var(--paper);box-shadow:0 12px 30px #0003}
+ html[data-theme="dark"] .tile,html[data-theme="dark"] .field,html[data-theme="dark"] .custom-toggle,html[data-theme="dark"] .auth-card,html[data-theme="dark"] .auth-input,html[data-theme="dark"] .auth-close,html[data-theme="dark"] .liquidity-entry,html[data-theme="dark"] .liquidity-detail-row{background:#202c28;color:#e7efec}
+ html[data-theme="dark"] .field{border-color:var(--line)}
+ html[data-theme="dark"] .btn-ghost,html[data-theme="dark"] .client-main-actions .btn-ghost{background:#ffffff0b;color:#e7efec;border-color:var(--line)}
+ html[data-theme="dark"] .btn-ghost:hover,html[data-theme="dark"] .record-row:hover{background:#ffffff12}
+ html[data-theme="dark"] .mobile-header .icon:hover,html[data-theme="dark"] .icon:hover{background:#ffffff12}
+ html[data-theme="dark"] .bottom-nav a.active>span{background:#55bcae24}
+ html[data-theme="dark"] .client-currency-pill.active{background:#ffffff20;color:#fff}
+ html[data-theme="dark"] .liquidity-direction-option.selected.owed{background:#512c2a;color:#ffb0a8}
+ html[data-theme="dark"] .liquidity-detail-total{background:linear-gradient(145deg,#1b3935,#21332e);border-color:#55bcae40}
+ html[data-theme="dark"] .liquidity-detail-total>strong{color:#62d0c4}
+ html[data-theme="dark"] .liquidity-note{background:#ba84281c;color:#ead7ad;border-color:#ba842850}
+ html[data-theme="dark"] th{background:#192420;color:var(--muted)}
+ html[data-theme="dark"] .success{background:#183b2a;color:#8ee0aa;border-color:#58c98650}
+ html[data-theme="dark"] .error{background:#3a2523;color:#ffaaa0;border-color:#f07b7050}
+ html[data-theme="dark"] .sync-banner{background:#342d1d;color:#e6cc8f;border-color:#d6ad5e40}
+}
