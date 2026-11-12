@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {ChevronLeft,Coins,FileText,Image as ImageIcon,Pencil,Plus,Save,Settings,Share2,Trash2} from 'lucide-react';
 import {useApp} from './store';
-import {Button,ErrorBox,Field,Sheet} from './ui';
+import {Button,Confirm,ErrorBox,Field,Sheet} from './ui';
 import {money,num,round,today} from './logic';
 
 const makeId=()=>globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -164,10 +164,11 @@ function LiquidityRateSheet({draft,setDraft,onClose,onSave,busy,onAddCurrency,ne
 }
 
 export function LiquidityPage(){
- const {settings,liquidity=[],liquiditySettings=[],mutate,online}=useApp();
+ const {settings,liquidity=[],liquiditySettings=[],mutate,remove,online}=useApp();
  const config=liquiditySettings.find(row=>row.id==='main');
  const [configDraft,setConfigDraft]=useState(null),[month,setMonth]=useState(today().slice(0,7));
  const [entries,setEntries]=useState([newEntry()]),[showRates,setShowRates]=useState(false),[showEntry,setShowEntry]=useState(false),[detailRecord,setDetailRecord]=useState(null);
+ const [recordToDelete,setRecordToDelete]=useState(null);
  const [newCurrency,setNewCurrency]=useState({code:'',name:'',symbol:'',rate:''});
  const [busy,setBusy]=useState(false),[rateBusy,setRateBusy]=useState(false),[exportBusy,setExportBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[exportError,setExportError]=useState(''),[exportNotice,setExportNotice]=useState('');
  const initialized=useRef(false);
@@ -314,7 +315,7 @@ export function LiquidityPage(){
   <section className="card liquidity-chart-card"><div className="section-heading padded"><div><h2><Coins size={17}/> تطوّر صافي السيولة</h2><p className="tiny">الشمعة تقارن الرصيد بآخر سجل محفوظ: الأخضر ارتفاع والأحمر انخفاض. لا تظهر ظلال داخل الشهر لعدم تسجيل أعلى وأدنى رصيد.</p></div></div><LiquidityChart rows={displayRows}/></section>
   <section className="card liquidity-history-card">
    <div className="section-heading padded"><div><h2>سجل العمليات</h2><p className="tiny">افتح سجل أي شهر لعرض المبالغ وتنزيله أو مشاركته.</p></div></div>
-  {history.length?<div className="record-list">{history.map(record=><button className="record-row liquidity-history-row" key={record.id} onClick={()=>{setDetailRecord(record);setExportError('');setExportNotice('')}}><span className="soft-icon"><Coins size={19}/></span><div className="grow min-zero text-right"><b>سيولة {monthName(record.month)}</b><small>{num(record.entries?.length||0)} مبلغ · {record._pending?'بانتظار المزامنة':'اضغط لعرض التفاصيل'}</small></div><div className="left nowrap"><b>{signedMoney(monthTotal(record))}</b><small>الصافي بالدولار</small></div><ChevronLeft size={16}/></button>)}</div>:<p className="report-empty">لا توجد سجلات بعد. اضغط «إضافة» لتسجيل سيولة الشهر.</p>}
+   {history.length?<div className="record-list">{history.map(record=><div className="liquidity-history-item" key={record.id}><button type="button" className="record-row liquidity-history-row" onClick={()=>{setDetailRecord(record);setExportError('');setExportNotice('')}}><span className="soft-icon"><Coins size={19}/></span><div className="grow min-zero text-right"><b>سيولة {monthName(record.month)}</b><small>{num(record.entries?.length||0)} مبلغ · {record._pending?'بانتظار المزامنة':'اضغط لعرض التفاصيل'}</small></div><div className="left nowrap"><b>{signedMoney(monthTotal(record))}</b><small>الصافي بالدولار</small></div><ChevronLeft size={16}/></button><button type="button" className="icon liquidity-history-delete" aria-label={`حذف سجل سيولة ${monthName(record.month)}`} title={record._pending?'لا يمكن حذف سجل بانتظار المزامنة':!online?'الحذف يتطلب اتصالًا بالإنترنت':'حذف سجل الشهر'} disabled={!online||record._pending} onClick={()=>setRecordToDelete(record)}><Trash2 size={17}/></button></div>)}</div>:<p className="report-empty">لا توجد سجلات بعد. اضغط «إضافة» لتسجيل سيولة الشهر.</p>}
   </section>
   {showEntry&&<Sheet title={currentRecord?'تعديل سيولة الشهر':'إضافة سيولة الشهر'} subtitle={monthName(month)} wide onClose={()=>setShowEntry(false)} footer={<><Button icon={Save} disabled={busy||!configDraft} onClick={saveMonth}>{busy?'جارٍ الحفظ…':currentRecord?'حفظ تعديل الشهر':'حفظ سيولة الشهر'}</Button><Button kind="ghost" onClick={()=>setShowEntry(false)}>إلغاء</Button></>}>
    <div className="stack">
@@ -344,6 +345,7 @@ export function LiquidityPage(){
     <ErrorBox>{exportError}</ErrorBox>{exportNotice&&<p className="tiny">{exportNotice}</p>}
    </div>
   </Sheet>}
+   {recordToDelete&&<Confirm title={`حذف سجل سيولة ${monthName(recordToDelete.month)}`} onClose={()=>setRecordToDelete(null)} onConfirm={async()=>{await remove('liquidity',recordToDelete.id);if(detailRecord?.id===recordToDelete.id)setDetailRecord(null)}}><p>سيُحذف سجل هذا الشهر وجميع مبالغه نهائيًا، وسيُعاد حساب مخطط السيولة. لا يمكن التراجع عن الحذف.</p></Confirm>}
   {showRates&&<LiquidityRateSheet draft={configDraft} setDraft={setConfigDraft} onClose={()=>setShowRates(false)} onSave={saveRates} busy={rateBusy} onAddCurrency={addCurrency} newCurrency={newCurrency} setNewCurrency={setNewCurrency} error={error}/>}
  </div>
 }
