@@ -750,6 +750,16 @@ def create_app(database_url=None, secret=None):
     dist = ROOT / 'frontend' / 'dist'
     if (dist / 'assets').exists():
         app.mount('/assets', StaticFiles(directory=dist / 'assets'), name='assets')
+    if (dist / 'control-panel').exists():
+        app.mount('/control-panel', StaticFiles(directory=dist / 'control-panel'), name='control-static')
+
+    @app.get('/control', include_in_schema=False)
+    @app.get('/control/', include_in_schema=False)
+    def control_panel():
+        control_page = dist / 'control-panel' / 'control.html'
+        if control_page.is_file():
+            return FileResponse(control_page, headers={'Cache-Control': 'no-store'})
+        raise HTTPException(503, 'Build the standalone control panel first')
 
     @app.get('/{path:path}', include_in_schema=False)
     def spa(path: str):

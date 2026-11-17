@@ -13,6 +13,7 @@
   },
   "routes": [
     { "src": "/api(?:/.*)?", "dest": "/api/index.py" },
+    { "src": "/control/?$", "dest": "/control-panel/control.html" },
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
   ]
