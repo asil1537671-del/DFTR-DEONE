@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import String, ForeignKey, ForeignKeyConstraint, UniqueConstraint, JSON, DateTime, Boolean, Float, Integer
+from sqlalchemy import String, ForeignKey, ForeignKeyConstraint, UniqueConstraint, JSON, DateTime, Boolean, Float, Integer, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -19,6 +19,33 @@ class User(Base):
     password_hash: Mapped[str | None] = mapped_column(String(200), nullable=True)
     display_name: Mapped[str] = mapped_column(String(200))
     google_sub: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class UserControl(Base):
+    __tablename__ = 'user_controls'
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    disabled_features: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class AuditEvent(Base):
+    __tablename__ = 'audit_events'
+    __table_args__ = (Index('ix_audit_target_created', 'target_user_id', 'created_at'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    actor_user_id: Mapped[str | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    target_user_id: Mapped[str | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    actor_email: Mapped[str] = mapped_column(String(254), default='')
+    actor_name: Mapped[str] = mapped_column(String(200), default='')
+    target_email: Mapped[str] = mapped_column(String(254), default='')
+    target_name: Mapped[str] = mapped_column(String(200), default='')
+    event_type: Mapped[str] = mapped_column(String(60))
+    entity_type: Mapped[str] = mapped_column(String(40), default='')
+    entity_id: Mapped[str] = mapped_column(String(80), default='')
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

@@ -53,7 +53,7 @@ Backend integration tests recreate tables **only in the dedicated `daftari_test`
 
 ## Configuration and behavior
 
-- `.env` supplies `DATABASE_URL`, `JWT_SECRET`, `COOKIE_SECURE`, `GOOGLE_CLIENT_ID`, and optional SMTP variables. HTTPS requests automatically receive Secure cookies; `COOKIE_SECURE=true` can additionally enforce Secure cookies behind a trusted HTTPS proxy. Leave it false for the plain HTTP IP deployment. Google sign-in is hidden unless configured. Password reset currently returns a success response but does not send mail.
+- `.env` supplies `DATABASE_URL`, `JWT_SECRET`, `ADMIN_EMAILS`, `COOKIE_SECURE`, `GOOGLE_CLIENT_ID`, and optional SMTP variables. `ADMIN_EMAILS` is a comma-separated allowlist for the owner-only administration panel; configure only an owner account you control because this panel can inspect all users' ledgers and control account access. Password signup currently does not verify mailbox ownership, so the allowlisted owner account must already be protected by credentials you control. HTTPS requests automatically receive Secure cookies; `COOKIE_SECURE=true` can additionally enforce Secure cookies behind a trusted HTTPS proxy. Leave it false for the plain HTTP IP deployment. Google sign-in is hidden unless configured. Password reset currently returns a success response but does not send mail.
 - Passwords use bcrypt. Authentication uses a same-site httpOnly JWT cookie; Bearer JWTs are also accepted. Tenant-owned primary/foreign keys include `user_id`.
 - Exchange rates and commissions are fixed at entry; the API independently computes persisted monetary fields. Automatic commissions apply only to USDT, including the documented legacy fixed-fee fallback. The documented blank-start-date statement edge is retained.
 - Records and withdrawals can be created/edited offline. Each account has its own localStorage cache and durable outbox, capped at 300 distinct rows. Reconnection and periodic retry replay the outbox using stable UUIDs. Rejected rows remain visible and can be edited or explicitly retried from Settings. Clients, settings, backups and server PDFs require connectivity.
@@ -75,6 +75,7 @@ Set these project environment variables for each intended environment (Productio
 | --- | --- |
 | `DATABASE_URL` | Required. Neon PostgreSQL URL ending in `?sslmode=require` (preserve any other Neon parameters). `postgres://`, `postgresql://`, and `postgresql+psycopg://` are accepted. Prefer Neon's pooled endpoint. |
 | `JWT_SECRET` | Required. Independently generated random secret, at least 32 characters; keep stable across function instances. |
+| `ADMIN_EMAILS` | Required to enable the owner panel. Comma-separated login email(s) allowed to view all accounts and manage account features/status. |
 | `DB_POOL` | Set `null` for serverless. `VERCEL=1` (automatically supplied by Vercel) also selects SQLAlchemy NullPool. |
 | `GOOGLE_CLIENT_ID` | Optional; leave empty to hide Google sign-in. If enabled, authorize the Vercel domain with Google. |
 | `COOKIE_SECURE` | Optional, `true` on Vercel. HTTPS is detected automatically; keep `false` on the existing HTTP IP deployment. |
