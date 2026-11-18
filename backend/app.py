@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 if __package__:
     from .models import Base, User, UserControl, AuditEvent, Client, Record, Withdrawal, Settings, LiquiditySettings, LiquidityMonth, LegacyArchive, serialize, camel
     from .logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded, custom_pricing_enabled
+    from .database import initialize_database, make_engine
 else:
     from models import Base, User, UserControl, AuditEvent, Client, Record, Withdrawal, Settings, LiquiditySettings, LiquidityMonth, LegacyArchive, serialize, camel
     from logic import DEFAULTS, calculate, automatic_commission, exchange_rate, aggregate, statement, number, rounded, custom_pricing_enabled
